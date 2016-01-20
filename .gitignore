@@ -1,0 +1,5 @@
+# Python
+.virtualenv
+*.pyc
+# Json
+out.json
