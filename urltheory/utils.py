@@ -12,7 +12,7 @@ def longest_common_prefix(a,b):
     >>> longest_common_prefix([0,1],[0,2,3])
     [0]
     >>> longest_common_prefix(u'hi there', u'himself')
-    u'hi'
+    [u'h', u'i']
     """
     idx = 0
     ret = []

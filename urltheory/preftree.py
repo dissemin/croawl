@@ -32,13 +32,23 @@ class PrefTree(object):
     by adding an intermediate internal node) and to be non-null.
     """
 
-    def __init__(self):
+    def __init__(self, url_count=0, success_count=0, success=None):
         """
-        Creates a leaf, with success set to false.
+        Creates a leaf.
+
+        :param url_count: the number of urls leading to that leaf
+        :param success_count: the number of successful urls leading to that leaf
+        :param success: if True, sets both url_count and success_count to 1
         """
         self.children = {}
-        self.url_count = 0
-        self.success_count = 0
+        if success is True:
+            success_count = 1
+            url_count = 1
+        elif success is False:
+            success_count = 0
+            url_count = 1
+        self.url_count = url_count
+        self.success_count = success_count
         self.is_wildcard = False
 
     def __getitem__(self, key):
@@ -74,12 +84,13 @@ class PrefTree(object):
         """
         found = False
 
-        leaf_node = PrefTree()
-        leaf_node.url_count = 1
-        self.url_count += 1
-        if success:
-            leaf_node.success_count = 1
-            self.success_count += 1
+        leaf_node = PrefTree(success=success)
+        self.url_count += leaf_node.url_count
+        self.success_count += leaf_node.success_count
+
+        if self.is_wildcard:
+            # a wildcard already matches the url to be added
+            return
 
         for key in self.children:
             lcp = longest_common_prefix(url, key)
@@ -107,6 +118,56 @@ class PrefTree(object):
             # if no internal node with a matching prefix was found
             # then add a new one with that prefix
             self[url] = leaf_node
+
+    def match(self, url):
+        """
+        Returns the number of time this URL was added and the number of time
+        it was a success.
+        """
+        if self.is_wildcard:
+            return (self.url_count, self.success_count)
+
+        # ensure we are dealing with a non-flattened list (not a string)
+        if type(url) != list:
+            url = [c for c in url]
+
+        urls = 0
+        successes = 0
+        for path in self.children:
+            subtree = self[path]
+            urls += subtree.url_count
+            successes += subtree.success_count
+            if list(url[:len(path)]) == list(path):
+                return subtree.match(url[len(path):])
+        if len(url) == 0:
+            return (self.url_count - urls, self.success_count - successes)
+        return (0,0)
+
+    def prune(self, min_urls=1, min_children=2, min_rate=1.):
+        """
+        Replaces subtrees where the rate of success is above min_rate
+        or below (1 - min_rate) by a wildcard, with the same url and success
+        counts.
+
+        :param min_urls: only prune subtrees that have at least `min_urls` urls.
+            This parameter has to be positive.
+        :param min_children: only prune subtrees that have at least that
+            many children.
+        """
+        if min_urls <= 0:
+            raise ValueError('Invalid min_urls parameter in PrefTree.prune')
+
+        if (self.url_count >= min_urls and
+            len(self.children) >= min_children and
+            float(self.success_count)/self.url_count >= min_rate):
+            self.is_wildcard = True
+            self.children.clear()
+        
+        for path in self.children:
+            self.children[path].prune(min_urls=min_urls,
+                                    min_children=min_children,
+                                    min_rate=min_rate)
+
 
     def urls(self, prepend=[]):
         """
@@ -177,5 +238,4 @@ class PrefTree(object):
                 return False
 
         return True
-
 
