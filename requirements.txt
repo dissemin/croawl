@@ -1,2 +1,3 @@
 scrapy
 requests
+hashable_collections
