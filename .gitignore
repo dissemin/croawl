@@ -1,5 +1,9 @@
 # Python
 .virtualenv
 *.pyc
+.coverage
+# Vim
+*.swp
+*.swo
 # Json
 out.json
