@@ -78,13 +78,19 @@ class PrefTree(object):
         else:
             del self.children[hashable.hashable_list(key)]
 
-    def add_url(self, url, success):
+    def add_url(self, url, success=None, url_count=1, success_count=0):
         """
         Recursively adds an URL to the prefix tree
+
+        :param success: boolean: if set to True, url_count, success_count = 1, 1
+                        if set to False, url_count, success_count = 1, 0
+        :param url_count: custom number of urls matching this pattern
+        :param success_count: custom number of successful urls matching this pattern
         """
         found = False
 
-        leaf_node = PrefTree(success=success)
+        leaf_node = PrefTree(success=success, url_count=url_count,
+                success_count=success_count)
         self.url_count += leaf_node.url_count
         self.success_count += leaf_node.success_count
 
@@ -110,7 +116,8 @@ class PrefTree(object):
                 self[lcp] = new_node
             else: # len(lcp) == len(key)
                 # Recursively add the url to the next internal node
-                self.children[key].add_url(url[len(lcp):], success)
+                self.children[key].add_url(url[len(lcp):], success=success,
+                        url_count=url_count, success_count=success_count)
             found = True
             break
         
@@ -143,30 +150,65 @@ class PrefTree(object):
             return (self.url_count - urls, self.success_count - successes)
         return (0,0)
 
-    def prune(self, min_urls=1, min_children=2, min_rate=1.):
+    def prune(self, min_urls=1, min_children=2, min_rate=1., reverse=False):
         """
         Replaces subtrees where the rate of success is above min_rate
         or below (1 - min_rate) by a wildcard, with the same url and success
         counts.
 
+        The function returns a new version of the tree, but the original tree
+        might also have been modified.
+
         :param min_urls: only prune subtrees that have at least `min_urls` urls.
             This parameter has to be positive.
         :param min_children: only prune subtrees that have at least that
             many children.
+        :param reverse: try to reverse subtrees when they are good candidates
+            for a prune.
+        :returns: a pair: the value of the new pruned tree,
+            and a boolean indicating whether some part of the tree has been pruned
         """
         if min_urls <= 0:
             raise ValueError('Invalid min_urls parameter in PrefTree.prune')
 
-        if (self.url_count >= min_urls and
-            len(self.children) >= min_children and
-            float(self.success_count)/self.url_count >= min_rate):
+        # Is this a good candidate for a prune ?        
+        should_be_pruned = (self.url_count >= min_urls and
+                len(self.children) >= min_children)
+        has_been_pruned = False
+        
+        success_rate = float(self.success_count)/self.url_count
+        if should_be_pruned and (
+                (success_rate >= min_rate) or
+                (success_rate <= 1. - min_rate)):
             self.is_wildcard = True
             self.children.clear()
+            has_been_pruned = True
         
         for path in self.children:
-            self.children[path].prune(min_urls=min_urls,
+            new_child, child_pruned = self.children[path].prune(min_urls=min_urls,
                                     min_children=min_children,
-                                    min_rate=min_rate)
+                                    min_rate=min_rate,
+                                    reverse=reverse)
+            if child_pruned:
+                self[path] = new_child
+                has_been_pruned = True
+
+        # If it is a good candidate for a prune, but has not been pruned,
+        # we can try reversing the urls
+        if (reverse and should_be_pruned and
+            not has_been_pruned and not self.has_wildcard()):
+            urls = self.urls()
+
+            rev = RevPrefTree()
+            for u, match_count, success_count in urls:
+                rev.add_url(u, url_count=match_count, success_count=success_count)
+
+            rev, pruned = rev.prune(min_urls=min_urls, min_children=min_children,
+                    min_rate=min_rate, reverse=False)
+            if pruned:
+                return (rev, True)
+
+        return (self, has_been_pruned)
 
 
     def urls(self, prepend=[]):
@@ -174,17 +216,38 @@ class PrefTree(object):
         Prints the list of URLs contained in the prefix tree
 
         :param prepend: first part of the URL, to be prepended to all URLs
+        :returns: a list of tuples: (url, matches_count, success_count)
         """
         if len(self.children) == 0:
             if self.is_wildcard:
-                return [prepend + ['*']]
-            return [prepend]
+                return [(prepend + ['*'],self.url_count,self.success_count)]
+            return [(prepend,self.url_count,self.success_count)]
         else:
             res = []
+            total_url_count = 0
+            total_success_count = 0
             for key in self.children:
                 new_prepend = prepend + key
-                res += self[key].urls(new_prepend)
+                child_urls = self[key].urls(new_prepend)
+                res += child_urls
+                total_url_count += sum([c for u, c, s in child_urls])
+                total_success_count += sum([s for u, c, s in child_urls])
+
+            if total_url_count < self.url_count:
+                res.append((prepend, (self.url_count - total_url_count),
+                              (self.success_count - total_success_count)))
             return res
+
+    def has_wildcard(self):
+        """
+        Returns True when there is at least one wildcard in this tree.
+        """
+        if self.is_wildcard:
+            return True
+        for subtree in self.children.values():
+            if subtree.has_wildcard():
+                return True
+        return False
 
     def print_as_tree(self, level=0, last_label='ROOT'):
         """
@@ -197,7 +260,8 @@ class PrefTree(object):
         if len(self.children) == 0:
             if self.is_wildcard:
                 last_label += '*'
-        print pipes+last_label+(' (%d/%d)'%(self.success_count,self.url_count))
+        print (pipes+last_label+(' (%d/%d)'%
+            (self.success_count,self.url_count))).encode('utf-8')
         for key, val in self.children.items():
             val.print_as_tree(level+1, last_label=flatten(key))
 
@@ -238,4 +302,45 @@ class PrefTree(object):
                 return False
 
         return True
+
+class RevPrefTree(PrefTree):
+    """
+    A reversed prefix tree (aka postfix tree).
+    All urls sent to it are reversed.
+    See :class:`PrefTree` for the documentation.
+    """
+    def add_url(self, url, success=None, url_count=1, success_count=0):
+        """
+        Recursively adds an URL to the postfix tree
+        """
+        super(RevPrefTree, self).add_url(list(reversed(url)),
+                success=success, url_count=url_count, success_count=success_count)
+
+    def match(self, url):
+        """
+        Returns the number of time this URL was added and the number of time
+        it was a success.
+        """
+        return super(RevPrefTree, self).match(list(reversed(url)))
+
+    def urls(self, prepend=[]):
+        """
+        Prints the list of URLs contained in the prefix tree
+
+        :param prepend: first part of the URL, to be prepended to all URLs
+        """
+        reversed_urls = [(list(reversed(l)), u, s) for l, u, s in
+                super(RevPrefTree, self).urls()]
+        return [(prepend+url,c,s) for url, c, s in reversed_urls]
+
+    def print_as_tree(self, level=0, last_label='ROOT'):
+        """
+        Prints the postfix tree as a prefix tree, adding warnings
+        to show that it is in fact a postfix tree
+        """
+        pipes = ''
+        if level > 0:
+            pipes = ((level-1)*'| ')+'|-'
+        print pipes+'<< reversed'
+        super(RevPrefTree, self).print_as_tree(level, last_label)
 

@@ -6,8 +6,8 @@ import doctest
 from hashable_collections.hashable_collections import hashable_list
 
 import urltheory
-import urltheory.tokenizer
-from urltheory.preftree import PrefTree
+from urltheory.tokenizer import *
+from urltheory.preftree import PrefTree, RevPrefTree
 from urltheory.utils import flatten
 
 class PrefTreeTest(unittest.TestCase):
@@ -19,25 +19,44 @@ class PrefTreeTest(unittest.TestCase):
         t = PrefTree()
         urls = ['aaba','cadb','abdc','abcd','afgh','abec']
         for u in urls:
-            t.add_url(u, False)
+            t.add_url(u)
             self.assertTrue(t.check_sanity())
+        self.assertFalse(t.has_wildcard())
         t.print_as_tree()
 
-        self.assertEqual(sorted(map(flatten, t.urls())), sorted(urls))
+        self.assertEqual(sorted([flatten(u) for u, c, s in t.urls()]), sorted(urls))
         for u in urls:
             self.assertEqual(t.match(u), (1,0))
         self.assertEqual(t.match('bac'), (0,0))
+
+    def test_urls(self):
+        t = PrefTree()
+        urls = ['aa','aa.pdf','bb','bb.pdf']
+        for u in urls:
+            t.add_url(u)
+        self.assertEqual(len(t.urls()), 4)
 
     def test_wildcard(self):
         t = PrefTree()
         t.add_url('arxiv.org/pdf/', True)
         t['arxiv.org/pdf/'].is_wildcard = True
         self.assertTrue(t.check_sanity())
+        self.assertTrue(t.has_wildcard())
         self.assertEqual(t.match('arxiv.org/pdf/1410.1454v2'), (1,1))
         t.add_url('arxiv.org/pdf/1412.8548v1', True)
         self.assertEqual(t.match('arxiv.org/pdf/1410.1454v2'), (2,2))
         t.print_as_tree()
         self.assertEqual(len(t.urls()), 1)
+
+    def test_with_tokenization(self):
+        t = PrefTree()
+        t.add_url(prepare_url('eprint.iacr.org/2016/093'), False)
+        t.add_url(prepare_url('eprint.iacr.org/2016/093.pdf'), True)
+        t.add_url(prepare_url('eprint.iacr.org/2015/1248.pdf'), True)
+        t.add_url(prepare_url('eprint.iacr.org/2015/1248'), False)
+        t.print_as_tree()
+        self.assertEqual(t.match(prepare_url('eprint.iacr.org/2014/528.pdf')), (2,2))
+        self.assertEqual(t.match(prepare_url('eprint.iacr.org/2014/528')), (2,0))
 
     def test_prune(self):
         t = PrefTree()
@@ -52,11 +71,43 @@ class PrefTreeTest(unittest.TestCase):
                 ('arxiv.org/pdf/1602.01i34', False), # oops
                 ]:
             t.add_url(url, success)
-        t.prune(min_rate=0.75,min_children=2,min_urls=1)
+        t, pruned = t.prune(min_rate=0.75,min_children=2,min_urls=1)
         self.assertEqual(len(t.urls()), 1)
+        self.assertTrue(t.has_wildcard())
         self.assertEqual(t.match('arxiv.org/pdf/1784.1920'), (5,4))
         self.assertEqual(t.match('arxiv.org/pdf/2340.0124'), (0,0))
         t.print_as_tree()
+
+    def test_prune_failures(self):
+        t = PrefTree()
+        for url, success in [
+                ('sciencedirect.com/paper1.pdf', False),
+                ('sciencedirect.com/paper2.pdf', False),
+                ('sciencedirect.com/paper3.pdf', False),
+                ('mysciencework.com/paper9.pdf', True),
+                ('mysciencework.com/paper8.pdf', False)]:
+            t.add_url(url, success)
+        t, pruned = t.prune(min_rate=0.95, min_children=2, min_urls=2)
+        self.assertEqual(t.match('sciencedirect.com/paper4.pdf'), (3,0))
+
+    def test_prune_with_reverse(self):
+        t = PrefTree()
+        for url, success in [
+            ('researchgate.net/publication/233865122_uriset', False),
+            ('researchgate.net/publication/143874230_albtedru', False),
+            ('researchgate.net/publication/320748374_kelbcad', False),
+            ('researchgate.net/publication/233865122_uriset.pdf', True),
+            ('researchgate.net/publication/143874230_albtedru.pdf', True),
+            ('researchgate.net/publication/320748374_kelbcad.pdf', True),
+            ('onlinelibrary.wiley.com/wol1/doi/10.1002/anie.200800037.abstract', False),
+            ('onlinelibrary.wiley.com/wol1/doi/10.1002/anie.200800037.pdf', False)]:
+            t.add_url(url, success)
+        t.print_as_tree()
+        t, pruned = t.prune(reverse=True)
+        t.print_as_tree()
+        self.assertTrue(t.check_sanity())
+        for u, c, s in t.urls():
+            print flatten(u), c, s
 
     def test_accessors(self):
         t = PrefTree()
@@ -87,6 +138,23 @@ class PrefTreeTest(unittest.TestCase):
         t2['def'] = t
         self.assertFalse(t2.check_sanity())
 
+class PrevPrefTreeTest(unittest.TestCase):
+    def test_create(self):
+        t = RevPrefTree()
+        for url, success in [
+            ('researchgate.net/publication/233865122_uriset', False),
+            ('researchgate.net/publication/143874230_albtedru', False),
+            ('researchgate.net/publication/320748374_kelbcad', False),
+            ('researchgate.net/publication/233865122_uriset.pdf', True),
+            ('researchgate.net/publication/143874230_albtedru.pdf', True),
+            ('researchgate.net/publication/320748374_kelbcad.pdf', True),
+            ]:
+            t.add_url(url, success)
+        t, pruned = t.prune()
+        t.print_as_tree()
+        self.assertEqual(len(t.urls()), 4)
+        self.assertEqual(t.match('researchgate.net/publication/7489168_lopdetu.pdf'),
+                (3,3))
 
 def load_tests(loader, tests, ignore):
     tests.addTests(doctest.DocTestSuite(urltheory.tokenizer))

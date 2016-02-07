@@ -37,4 +37,3 @@ def flatten(lst):
         res += unicode(x)
     return res
 
-
