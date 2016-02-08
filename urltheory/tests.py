@@ -8,6 +8,7 @@ from hashable_collections.hashable_collections import hashable_list
 import urltheory
 from urltheory.tokenizer import *
 from urltheory.preftree import PrefTree, RevPrefTree
+from urltheory.urlfilter import *
 from urltheory.utils import flatten
 
 class PrefTreeTest(unittest.TestCase):
@@ -76,6 +77,7 @@ class PrefTreeTest(unittest.TestCase):
         self.assertTrue(t.has_wildcard())
         self.assertEqual(t.match('arxiv.org/pdf/1784.1920'), (5,4))
         self.assertEqual(t.match('arxiv.org/pdf/2340.0124'), (0,0))
+        self.assertTrue(t.predict_success('arxiv.org/pdf/1784.1920', threshold=0.6))
         t.print_as_tree()
 
     def test_prune_failures(self):
@@ -89,6 +91,7 @@ class PrefTreeTest(unittest.TestCase):
             t.add_url(url, success)
         t, pruned = t.prune(min_rate=0.95, min_children=2, min_urls=2)
         self.assertEqual(t.match('sciencedirect.com/paper4.pdf'), (3,0))
+        self.assertFalse(t.predict_success('sciencedirect.com/paper4.pdf'))
 
     def test_prune_with_reverse(self):
         t = PrefTree()
@@ -155,6 +158,40 @@ class PrevPrefTreeTest(unittest.TestCase):
         self.assertEqual(len(t.urls()), 4)
         self.assertEqual(t.match('researchgate.net/publication/7489168_lopdetu.pdf'),
                 (3,3))
+
+class URLFilterTest(unittest.TestCase):
+    def test_predict(self):
+        f = URLFilter(prune_delay=5,min_urls=3)
+        urls = [
+            ('http://researchgate.net/publication/233865122_uriset', False),
+            ('http://researchgate.net/publication/143874230_albtedru', False),
+            ('http://eprints.soton.ac.uk/pub/enrstancs.pdf', True),
+            ('http://eprints.soton.ac.uk/pub/enrstancs/abs', False),
+            ('http://researchgate.net/publication/233865122_uriset.pdf', True),
+            ('http://researchgate.net/publication/942758431_plecuste', False),
+            ('http://onlinelibrary.wiley.com/wol1/doi/10.1002/anie.200800037.abstract', False),
+            ('http://researchgate.net/publication/320748374_kelbcad.pdf', True),
+            ('http://researchgate.net/publication/942758431_plecuste.pdf', True),
+            ('http://hal.archives-ouvertes.fr/hal-47198374', False),
+            ('http://hal.archives-ouvertes.fr/hal-47198374/document', True),
+            ('http://onlinelibrary.wiley.com/wol1/doi/10.1002/anie.200800037.pdf', False),
+            ('http://researchgate.net/publication/617445243_bcldecry', False),
+            ('http://researchgate.net/publication/320748374_kelbcad', False),
+            ('http://hal.archives-ouvertes.fr/hal-3281748', False),
+            ('http://hal.archives-ouvertes.fr/hal-0492738/document', True),
+            ('http://researchgate.net/publication/143874230_albtedru.pdf', True),
+            ('http://researchgate.net/publication/617445243_bcldecry.pdf', True),
+            ]
+        for url, success in urls:
+            f.add_url(url, success)
+        f.t.print_as_tree()
+        self.assertTrue(f.t.check_sanity())
+        self.assertFalse(f.predict_success('http://hal.archives-ouvertes.fr/hal-324581'))
+        self.assertTrue(f.predict_success('http://hal.archives-ouvertes.fr/hal-429838/document'))
+        self.assertTrue(f.predict_success('http://researchgate.net/publication/482893_erscbderl.pdf'))
+        self.assertEqual(f.predict_success('http://eprints.soton.ac.uk/pub/oldcest.pdf'),
+                None)
+
 
 def load_tests(loader, tests, ignore):
     tests.addTests(doctest.DocTestSuite(urltheory.tokenizer))

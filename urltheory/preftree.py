@@ -150,6 +150,20 @@ class PrefTree(object):
             return (self.url_count - urls, self.success_count - successes)
         return (0,0)
 
+    def predict_success(self, url, threshold=0.95):
+        """
+        Returns True when the number of successes matching this url
+        is positive and above threshold * url_count, which corresponds
+        to predicting a success.
+        Returns False when it predicts a failure, and returns nothing
+        when it fails to predict.
+        """
+        url_count, success_count = self.match(url)
+        if (url_count > 0 and threshold*url_count <= success_count):
+            return True
+        if (url_count > 0 and (1.-threshold)*url_count >= success_count):
+            return False
+
     def prune(self, min_urls=1, min_children=2, min_rate=1., reverse=False):
         """
         Replaces subtrees where the rate of success is above min_rate
