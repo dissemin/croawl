@@ -27,8 +27,10 @@ USER_AGENT = 'DisseminBot (+http://dev.dissem.in/bot.html)'
 DOWNLOAD_DELAY=3
 ROBOTSTXT_OBEY=True
 # The download delay setting will honor only one of:
-#CONCURRENT_REQUESTS_PER_DOMAIN=16
+CONCURRENT_REQUESTS_PER_DOMAIN=1
 #CONCURRENT_REQUESTS_PER_IP=16
+
+DOWNLOAD_MAXSIZE=20971520 # 20MB
 
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED=False

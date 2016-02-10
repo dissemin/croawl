@@ -150,7 +150,7 @@ class PrefTree(object):
             return (self.url_count - urls, self.success_count - successes)
         return (0,0)
 
-    def predict_success(self, url, threshold=0.95):
+    def predict_success(self, url, threshold=0.95, min_urls=10):
         """
         Returns True when the number of successes matching this url
         is positive and above threshold * url_count, which corresponds
@@ -159,6 +159,8 @@ class PrefTree(object):
         when it fails to predict.
         """
         url_count, success_count = self.match(url)
+        if url_count < min_urls:
+            return None
         if (url_count > 0 and threshold*url_count <= success_count):
             return True
         if (url_count > 0 and (1.-threshold)*url_count >= success_count):
