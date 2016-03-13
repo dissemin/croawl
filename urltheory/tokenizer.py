@@ -21,9 +21,15 @@ def prepare_url(url):
     [u'.com', u'.duckduckgo', u'/', u'?', u'q', u'=', u't', u'e', u's', u't']
     >>> prepare_url(u'http://umas.edu:80/abs')
     [u'.edu', u'.umas', u':', 0, u'/', u'a', u'b', u's']
+    >>> prepare_url(u'http://umas.AC.uk/pdf')
+    [u'.uk', u'.ac', u'.umas', u'/', u'p', u'd', u'f']
     >>> prepare_url(None)
     >>> prepare_url(u'http://bad_/test')
     [u'_', u'b', u'a', u'd', u'_', u'/', u't', u'e', u's', u't']
+    >>> prepare_url(u'http://dx.doi.org/10.3406/1')
+    [u'.org', u'.doi', u'.dx', u'/', u'1', u'0', u'.', u'3', u'4', u'0', u'6', u'/', u'1']
+    >>> prepare_url('http://hdl.handle.net/10985/7376')
+    [u'.net', u'.handle', u'.hdl', u'/', u'1', u'0', u'9', u'8', u'5', u'/', u'7', u'3', u'7', u'6']
     """
     if not url:
         return url
@@ -32,8 +38,18 @@ def prepare_url(url):
     match = domain_re.match(url)
     if not match:
         return ['_']+tokenize_url_path(url)
-    reversed_domain = ['.'+dom for dom in reversed(match.group(1).split('.'))]
-    return reversed_domain + tokenize_url_path(match.group(2))
+
+    reversed_domain = ['.'+dom.lower() for dom in reversed(match.group(1).split('.'))]
+
+    # do not tokenize DOIs or HANDLES as the numbers they contain can be significant
+    # to guess full text availability
+    if match.group(1) == 'dx.doi.org' or match.group(1) == 'hdl.handle.net':
+        url_path = [c for c in match.group(2)]
+    # otherwise, tokenize
+    else:
+        url_path = tokenize_url_path(match.group(2))
+
+    return reversed_domain + url_path
 
 
 

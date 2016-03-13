@@ -31,6 +31,7 @@ CONCURRENT_REQUESTS_PER_DOMAIN=1
 #CONCURRENT_REQUESTS_PER_IP=16
 
 DOWNLOAD_MAXSIZE=20971520 # 20MB
+RETRY_ENABLED = False # To speed things up
 
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED=False
@@ -53,6 +54,7 @@ DOWNLOAD_MAXSIZE=20971520 # 20MB
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
+    'croawl.middlewares.classifier.ClassifierMiddleware': 50,
     'scrapy.downloadermiddlewares.robotstxt.RobotsTxtMiddleware': 100,
 }
 
