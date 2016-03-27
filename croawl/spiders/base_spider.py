@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 import scrapy
 import logging
+import json
 
 from collections import defaultdict
 from scrapy.http import Request, Response
@@ -18,21 +19,49 @@ class OAIMetadata(scrapy.Item):
     title = scrapy.Field()
     splash_url = scrapy.Field()
     pdf_url = scrapy.Field()
+    date = scrapy.Field()
+    year = scrapy.Field()
+    pmid = scrapy.Field()
+    firstpage = scrapy.Field()
+    lastpage = scrapy.Field()
+    doi = scrapy.Field()
+    jtitle = scrapy.Field()
+    volume = scrapy.Field()
+    issue = scrapy.Field()
+    conftitle = scrapy.Field()
+    booktitle = scrapy.Field()
+    authors = scrapy.Field()
+    emails = scrapy.Field()
+    issn = scrapy.Field()
     absft_url = scrapy.Field()
     base_oa = scrapy.Field()
     from_abs = scrapy.Field()
 
 field_mappings = {
-        'title': (False,['citation_title','DC.Title']),
+        'title': (False,['citation_title','eprints.title','DC.Title']),
         'splash_url': (False,['citation_public_url','citation_abstract_html_url']),
         'pdf_url': (False,['citation_pdf_url','eprints.document_url',]),
+        'date': (False,['citation_date','citation_publication_date','eprints.date']),
+        'year': (False,['citation_year']),
+        'pmid': (False,['citation_pmid']),
+        'firstpage': (False,['citation_firstpage']),
+        'lastpage': (False,['citation_lastpage']),
+        'doi': (False,['citation_doi']),
+        'jtitle': (False,['citation_journal_title']),
+        'volume': (False,['citation_volume']),
+        'issue': (False,['citation_issue']),
+        'conftitle': (False,['citation_conference_title','citation_conference']),
+        'booktitle': (False,['citation_book_title']),
+        'authors': (True,['citation_author','eprints.creator_name','DC.creator']),
+        'emails': (True,['eprints.creators_id']),
+        'issn': (False,['eprints.issn']),
         }
 
 class BaseSpider(scrapy.Spider):
     name = "base"
 
     def start_requests(self):
-        fname = 'few_urls' # 'base_urls.uniq'
+        fname = 'few_urls' #'base_urls.uniq'
         with codecs.open(fname, 'r', 'utf-8') as f:
             for line in f:
                 fields = line.strip().split('\t')
@@ -61,7 +90,7 @@ class BaseSpider(scrapy.Spider):
         flags = response.flags
         for flag in flags:
             if flag.startswith('classified_'):
-                classification = flag[len('classified_)'):]
+                classification = flag[len('classified_'):]
 
         if not classification:
             return

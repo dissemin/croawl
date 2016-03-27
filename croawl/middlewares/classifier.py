@@ -11,13 +11,7 @@ from scrapy.http import Request, Response
 
 from urltheory.urlfilter import *
 from croawl.utils import *
-
-field_mappings = {
-        'title': (False,['citation_title','DC.Title']),
-        'splash_url': (False,['citation_public_url','citation_abstract_html_url']),
-        'pdf_url': (False,['citation_pdf_url','eprints.document_url',]),
-        }
-
+from croawl.spiders.base_spider import field_mappings
 
 positive_classifications = ['pdf','abs','absft']
 
