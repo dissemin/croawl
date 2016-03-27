@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 import logging
 import json
+import psycopg2
+import datetime
 
 import scrapy
 from scrapy.http import Request, Response
@@ -17,13 +19,52 @@ field_mappings = {
         }
 
 
+positive_classifications = ['pdf','abs','absft']
+
+derived_classifications = {
+        'nopdf': (False,None,None),
+        'noabs': (False,False,False),
+        }
+
+
 class ClassifierMiddleware(object):
     def __init__(self, *args, **kwargs):
         super(ClassifierMiddleware, self).__init__(*args, **kwargs)
         self.trees = {}
-        for cls in ['pdf','abs','absft']:
+        for cls in positive_classifications:
             self.trees[cls] = URLFilter()
             self.trees[cls].load('models/fltr.train%s.pkl' % cls)
+
+        try:
+            from croawl.settings import CLASSIFIER_DATABASE
+            self.conn = psycopg2.connect(**CLASSIFIER_DATABASE)
+            self.conn.set_session(autocommit=True)
+        except Exception as e:
+            print e
+            raise ValueError("Invalid connection parameters")
+            self.conn = None
+
+    def update_url_db(self, url, classification):
+        """
+        Stores the classification of the given URL in the SQL database,
+        so that it can be reused later to train a classifier.
+        """
+        if not self.conn:
+            raise ValueError("Database not connected")
+        url = url[:1024]
+        if not classification:
+            return
+        if len(classification) > 32:
+            raise ValueError('Invalid classification')
+
+        curtime = datetime.datetime.now()
+
+        cur = self.conn.cursor()
+        nb_records = cur.execute("UPDATE urls SET (fetched,classification) = (%s,%s) WHERE url = %s", (curtime,classification,url))
+        print nb_records
+        if not cur.rowcount:
+            print (url,curtime,classification)
+            cur.execute("INSERT INTO urls (url,fetched,classification) VALUES (%s,%s,%s)", (url,curtime,classification))
 
     def process_request(self, request, spider):
         stats = spider.crawler.stats
@@ -54,6 +95,7 @@ class ClassifierMiddleware(object):
                 return response
 
         classification, metadata = self.classify_document(response)
+        self.update_url_db(request.url, classification)
         response.flags.append('classified_'+classification)
         if metadata:
             response = response.replace(body=json.dumps(metadata))

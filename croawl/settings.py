@@ -58,6 +58,15 @@ DOWNLOADER_MIDDLEWARES = {
     'scrapy.downloadermiddlewares.robotstxt.RobotsTxtMiddleware': 100,
 }
 
+# URL classifier: database where the classification of downloaded URLs is logged
+CLASSIFIER_DATABASE = {
+        'database':'croawl',
+        'user':'croawl',
+        'password':'croawl',
+        'host':'localhost',
+        'port':5432,
+}
+
 # Enable or disable extensions
 # See http://scrapy.readthedocs.org/en/latest/topics/extensions.html
 #EXTENSIONS = {
