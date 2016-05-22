@@ -12,6 +12,9 @@ from urltheory.urlfilter import *
 
 from time import sleep
 
+from oaipmh.client import Client
+from oaipmh.metadata import MetadataRegistry, base_dc_reader
+
 from croawl.utils import *
 import codecs
 
@@ -61,15 +64,19 @@ class BaseSpider(scrapy.Spider):
     name = "base"
 
     def start_requests(self):
-        fname = 'doi_list.txt' #'base_urls.uniq'
-        with codecs.open(fname, 'r', 'utf-8') as f:
-            for line in f:
-                fields = line.strip().split('\t')
-                if len(fields) != 2 or fields[1] != '2':
-                    continue
-                metadata = {'base_oa':fields[1],
-                        'splash_url':fields[0]}
-                yield self.filter_url(fields[0], metadata, looking_for='any')
+        registry = MetadataRegistry()
+        registry.registerReader('base_dc', base_dc_reader)
+        client = Client('http://doai.io/oai', registry)
+        for header, record, _ in client.listRecords(metadataPrefix='base_dc'):
+            # only process records for which base was unsure
+            print record['oa'], record['identifier']
+            if '2' not in record['oa']:
+                continue
+            # extract splash_url
+            for link in record['identifier']:
+                metadata = {'base_oa':''.join(record['oa']),
+                        'splash_url':link}
+                yield self.filter_url(link,metadata, looking_for='any')
 
     def filter_url(self, url, metadata, looking_for=None):
         try:
