@@ -122,7 +122,7 @@ class ClassifierMiddleware(object):
         t1 = timeit.timeit()
         success = {cls: t.predict_success(url) for (cls,t) in self.trees.items()}
         t2 = timeit.timeit()
-        logging.info("filtering "+url+": abs=%s, pdf=%s, absft=%s in %s" % (str(success['abs']),str(success['pdf']),str(success['absft']),str(t2-t1)))
+        logging.info("filtering "+url+": abs=%s, pdf=%s in %s" % (str(success['abs']),str(success['pdf'])),str(t2-t1)))
         return self.successes_to_class(success)
 
     def successes_to_class(self, successes):
@@ -229,7 +229,13 @@ class ClassifierMiddleware(object):
             if values:
                 found = True
                 if is_list:
-                    fields[key] = values
+                    # deduplicate the list
+                    dedup = []
+                    for v in values:
+                        if v not in dedup:
+                            dedup.append(v)
+                    # assign it
+                    fields[key] = dedup
                 else:
                     fields[key] = values[0]
 

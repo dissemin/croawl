@@ -49,6 +49,32 @@ class PrefTreeTest(unittest.TestCase):
         t.print_as_tree()
         self.assertEqual(len(t.urls()), 1)
 
+    def test_match(self):
+        t = PrefTree()
+        urls = [
+                ('aab/ced',True),
+                ('aab/ru',False),
+                ('bcadr/ste',False),
+                ('aab/t/est',True),
+                ('aab/t/le',True),
+                ('aab/stts',False),
+                ]
+        for u, s in urls:
+            t.add_url(u, s)
+        t, pruned = t.prune(min_rate=0.9, min_children=2,min_urls=1)
+
+        c, s, b = t.match_with_branch('aab/t/lu')
+        self.assertEqual((c,s),(2,2))
+        self.assertEqual(''.join(b), 'aab/t/*')
+
+        c, s, b = t.match_with_branch('aab/xx')
+        self.assertEqual((c,s),(0,0))
+        self.assertEqual(''.join(b), 'aab/<unk>')
+
+        c, s, b = t.match_with_branch('aab/ced')
+        self.assertEqual((c,s),(1,1))
+        self.assertEqual(''.join(b), 'aab/ced')
+
     def test_with_tokenization(self):
         t = PrefTree()
         t.add_url(prepare_url('eprint.iacr.org/2016/093'), False)
@@ -58,6 +84,10 @@ class PrefTreeTest(unittest.TestCase):
         t.print_as_tree()
         self.assertEqual(t.match(prepare_url('eprint.iacr.org/2014/528.pdf')), (2,2))
         self.assertEqual(t.match(prepare_url('eprint.iacr.org/2014/528')), (2,0))
+
+    def test_prune_empty_tree(self):
+        t = PrefTree()
+        t.prune() # should not raise anything
 
     def test_prune(self):
         t = PrefTree()

@@ -39,6 +39,7 @@ class OAIMetadata(scrapy.Item):
     absft_url = scrapy.Field()
     base_oa = scrapy.Field()
     from_abs = scrapy.Field()
+    from_identifier = scrapy.Field()
 
 field_mappings = {
         'title': (False,['citation_title','eprints.title','DC.Title']),
@@ -69,13 +70,13 @@ class BaseSpider(scrapy.Spider):
         client = Client('http://doai.io/oai', registry)
         for header, record, _ in client.listRecords(metadataPrefix='base_dc'):
             # only process records for which base was unsure
-            print record['oa'], record['identifier']
             if '2' not in record['oa']:
                 continue
             # extract splash_url
             for link in record['identifier']:
                 metadata = {'base_oa':''.join(record['oa']),
-                        'splash_url':link}
+                        'splash_url':link,
+                        'from_identifier':header.identifier()}
                 yield self.filter_url(link,metadata, looking_for='any')
 
     def filter_url(self, url, metadata, looking_for=None):

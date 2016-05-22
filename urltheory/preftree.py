@@ -147,11 +147,24 @@ class PrefTree(object):
 
     def match(self, url):
         """
-        Returns the number of time this URL was added and the number of time
-        it was a success.
+        Returns the number of times this URL was added and the number of times
+        it was marked as a success.
+        
+        :returns: a pair of integers
+        """
+        tot_count, success_count, _ = self.match_with_branch(url)
+        return (tot_count, success_count)
+
+    def match_with_branch(self, url):
+        """
+        As match(), returns the total and success count for a given URL,
+        but also the pattern of the branch corresponding to that URL in the tree.
+
+        :returns: a tuple: (total_count, success_count, branch)
+            where the branch is a list listing all the labels of the branches.
         """
         if self.is_wildcard:
-            return (self.url_count, self.success_count)
+            return (self.url_count, self.success_count, ['*'])
 
         # ensure we are dealing with a non-flattened list (not a string)
         if type(url) != list:
@@ -164,10 +177,12 @@ class PrefTree(object):
             urls += subtree.url_count
             successes += subtree.success_count
             if list(url[:len(path)]) == list(path):
-                return subtree.match(url[len(path):])
+                tot_count, suc_count, sub_branch = subtree.match_with_branch(url[len(path):])
+                return (tot_count, suc_count, path + sub_branch)
+
         if len(url) == 0:
-            return (self.url_count - urls, self.success_count - successes)
-        return (0,0)
+            return (self.url_count - urls, self.success_count - successes, [])
+        return (0,0, ['<unk>'])
 
     def predict_success(self, url, threshold=0.95, min_urls=10):
         """
@@ -206,6 +221,8 @@ class PrefTree(object):
         """
         if min_urls <= 0:
             raise ValueError('Invalid min_urls parameter in PrefTree.prune')
+        if self.url_count == 0:
+            return
 
         # Is this a good candidate for a prune ?        
         should_be_pruned = (self.url_count >= min_urls and
