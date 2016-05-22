@@ -51,6 +51,13 @@ class PrefTree(object):
         self.success_count = success_count
         self.is_wildcard = False
 
+    def assign(self, other):
+        """
+        Copies other into self.
+        """
+        self.__dict__ = other.__dict__.copy()
+        self.__class__ = other.__class__
+
     def __getitem__(self, key):
         """
         Shorthand for `children[key]`
@@ -78,7 +85,7 @@ class PrefTree(object):
         else:
             del self.children[hashable.hashable_list(key)]
 
-    def add_url(self, url, success=None, url_count=1, success_count=0):
+    def add_url(self, url, success=None, url_count=1, success_count=0, prune_kwargs=None):
         """
         Recursively adds an URL to the prefix tree
 
@@ -86,6 +93,9 @@ class PrefTree(object):
                         if set to False, url_count, success_count = 1, 0
         :param url_count: custom number of urls matching this pattern
         :param success_count: custom number of successful urls matching this pattern
+        :param prune_kwargs: should we simultaneously keep the tree pruned? if so,
+            this parameter should contain the dict of parameters used by prune()
+            (passed as **kwargs).
         """
         found = False
 
@@ -114,10 +124,11 @@ class PrefTree(object):
                 new_node.success_count = old_node.success_count + leaf_node.success_count
                 del self[key]
                 self[lcp] = new_node
-            else: # len(lcp) == len(key)
+            else: # in this case, len(lcp) == len(key)
                 # Recursively add the url to the next internal node
                 self.children[key].add_url(url[len(lcp):], success=success,
-                        url_count=url_count, success_count=success_count)
+                        url_count=url_count, success_count=success_count,
+                        prune_kwargs=prune_kwargs)
             found = True
             break
         
@@ -125,6 +136,14 @@ class PrefTree(object):
             # if no internal node with a matching prefix was found
             # then add a new one with that prefix
             self[url] = leaf_node
+
+        if prune_kwargs is not None:
+            # We have added a node to our tree, so we should try to prune (non-recursively)
+            kwargs = prune_kwargs.copy()
+            kwargs['recurse'] = False
+            pruned, success = self.prune(**kwargs)
+            if success:
+                self.assign(pruned)
 
     def match(self, url):
         """
@@ -166,7 +185,7 @@ class PrefTree(object):
         if (url_count > 0 and (1.-threshold)*url_count >= success_count):
             return False
 
-    def prune(self, min_urls=1, min_children=2, min_rate=1., reverse=False):
+    def prune(self, min_urls=1, min_children=2, min_rate=1., reverse=False, recurse=True):
         """
         Replaces subtrees where the rate of success is above min_rate
         or below (1 - min_rate) by a wildcard, with the same url and success
@@ -181,6 +200,7 @@ class PrefTree(object):
             many children.
         :param reverse: try to reverse subtrees when they are good candidates
             for a prune.
+        :param recurse: prune the tree recursively
         :returns: a pair: the value of the new pruned tree,
             and a boolean indicating whether some part of the tree has been pruned
         """
@@ -200,27 +220,29 @@ class PrefTree(object):
             self.children.clear()
             has_been_pruned = True
         
-        for path in self.children:
-            new_child, child_pruned = self.children[path].prune(min_urls=min_urls,
-                                    min_children=min_children,
-                                    min_rate=min_rate,
-                                    reverse=reverse)
-            if child_pruned:
-                self[path] = new_child
-                has_been_pruned = True
+        if recurse:
+            for path in self.children:
+                new_child, child_pruned = self.children[path].prune(min_urls=min_urls,
+                                        min_children=min_children,
+                                        min_rate=min_rate,
+                                        reverse=reverse,
+                                        recurse=True)
+                if child_pruned:
+                    self[path] = new_child
+                    has_been_pruned = True
 
         # If it is a good candidate for a prune, but has not been pruned,
         # we can try reversing the urls
         if (reverse and should_be_pruned and
-            not has_been_pruned and not self.has_wildcard()):
+                not has_been_pruned and not self.has_wildcard()):
+            # we cannot reverse a tree if it already contains a wildcard…
             urls = self.urls()
-
             rev = RevPrefTree()
             for u, match_count, success_count in urls:
                 rev.add_url(u, url_count=match_count, success_count=success_count)
 
             rev, pruned = rev.prune(min_urls=min_urls, min_children=min_children,
-                    min_rate=min_rate, reverse=False)
+                    min_rate=min_rate, reverse=False, recurse=True)
             if pruned:
                 return (rev, True)
 
@@ -325,12 +347,11 @@ class RevPrefTree(PrefTree):
     All urls sent to it are reversed.
     See :class:`PrefTree` for the documentation.
     """
-    def add_url(self, url, success=None, url_count=1, success_count=0):
+    def add_url(self, url, **kwargs):
         """
         Recursively adds an URL to the postfix tree
         """
-        super(RevPrefTree, self).add_url(list(reversed(url)),
-                success=success, url_count=url_count, success_count=success_count)
+        super(RevPrefTree, self).add_url(list(reversed(url)), **kwargs)
 
     def match(self, url):
         """

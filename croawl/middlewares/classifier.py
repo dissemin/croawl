@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import logging
+import timeit
 import json
 import psycopg2
 import datetime
@@ -118,8 +119,10 @@ class ClassifierMiddleware(object):
         """
         Predicts what this URL points to.
         """
+        t1 = timeit.timeit()
         success = {cls: t.predict_success(url) for (cls,t) in self.trees.items()}
-        logging.info("filtering "+url+": abs=%s, pdf=%s, absft=%s" % (str(success['abs']),str(success['pdf']),str(success['absft'])))
+        t2 = timeit.timeit()
+        logging.info("filtering "+url+": abs=%s, pdf=%s, absft=%s in %s" % (str(success['abs']),str(success['pdf']),str(success['absft']),str(t2-t1)))
         return self.successes_to_class(success)
 
     def successes_to_class(self, successes):
@@ -169,11 +172,12 @@ class ClassifierMiddleware(object):
         """
         Retrains fresh classifiers from the URL database
         """
+        print "Retraining classifier, this can take a while..."
         # init trees
         self.trees = {}
         for cls in positive_classifications:
             self.trees[cls] = URLFilter(prune_delay=0,min_rate=0.99,
-                    threshold=0.95,min_urls_prediction=20,min_urls_prune=20)
+                    threshold=0.95,min_urls_prediction=20,min_urls_prune=40)
 
         # add urls
         self.conn.set_isolation_level(1)
@@ -189,13 +193,12 @@ class ClassifierMiddleware(object):
                     successes = self.class_to_successes(classification)
                     for key, val in successes.items():
                         if val is not None:
-                            self.trees[key].add_url(url, val)
+                            self.trees[key].add_url(url, val, keep_pruned=False)
 
         self.conn.set_isolation_level(0)
 
         # prune trees and save them
         for cls in positive_classifications:
-            print cls
             self.trees[cls].force_prune()
             self.trees[cls].save('models/filter-%s-from-db.pkl' % cls)
 

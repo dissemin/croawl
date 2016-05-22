@@ -118,7 +118,18 @@ class URLFilter(object):
         self.last_prune = 0
         self.t = PrefTree()
 
-    def add_url(self, url, success=False):
+    def _prune_kwargs(self):
+        """
+        Returns the prune keyword arguments to be passed to
+        PrefTree.prune
+        """
+        return {'reverse':self.reverse,
+                'min_urls':self.min_urls_prune,
+                'min_children':self.min_children,
+                'min_rate':self.min_rate}
+    
+
+    def add_url(self, url, success=False, keep_pruned=True):
         """
         :param url: the URL to add to the filter
         :param success: whether we should consider it successful
@@ -126,21 +137,21 @@ class URLFilter(object):
         tokenized = prepare_url(url)
         if not tokenized:
             return
-        self.t.add_url(tokenized, success=success)
-        self.last_prune += 1
-        if self.prune_delay and self.last_prune >= self.prune_delay:
-            self.force_prune()
+        
+        if keep_pruned:
+            self.t.add_url(tokenized, success=success, prune_kwargs=self._prune_kwargs())
+        else:
+            self.t.add_url(tokenized, success=success)
+            self.last_prune += 1
+            if self.prune_delay and self.last_prune >= self.prune_delay:
+                self.force_prune()
 
     def force_prune(self):
         """
         Prunes the tree according to the parameters stored in the filter.
         """
-        self.t, pruned = self.t.prune(reverse=self.reverse,
-                min_urls=self.min_urls_prune,
-                min_children=self.min_children,
-                min_rate=self.min_rate)
+        self.t, pruned = self.t.prune(**self._prune_kwargs())
         self.last_prune = 0
-        self.t.print_as_tree()
 
     def predict_success(self, url):
         """

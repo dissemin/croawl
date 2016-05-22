@@ -160,9 +160,9 @@ class PrevPrefTreeTest(unittest.TestCase):
                 (3,3))
 
 class URLFilterTest(unittest.TestCase):
-    def test_predict(self):
-        f = URLFilter(prune_delay=5,min_urls_prediction=1,min_urls_prune=3)
-        urls = [
+    def __init__(self, *args, **kwargs):
+        super(URLFilterTest, self).__init__(*args, **kwargs)
+        self.urls = [
             ('http://researchgate.net/publication/233865122_uriset', False),
             ('http://researchgate.net/publication/143874230_albtedru', False),
             ('http://eprints.soton.ac.uk/pub/enrstancs.pdf', True),
@@ -182,15 +182,61 @@ class URLFilterTest(unittest.TestCase):
             ('http://researchgate.net/publication/143874230_albtedru.pdf', True),
             ('http://researchgate.net/publication/617445243_bcldecry.pdf', True),
             ]
-        for url, success in urls:
-            f.add_url(url, success)
-        f.t.print_as_tree()
-        self.assertTrue(f.t.check_sanity())
+
+    def test_predict(self):
+        f = URLFilter(
+                prune_delay=5,
+                min_urls_prediction=1,
+                min_urls_prune=3,
+                min_rate=0.7,
+                )
+        for url, success in self.urls:
+            f.add_url(url, success, keep_pruned=False)
+            self.assertTrue(f.t.check_sanity())
+        #f.t.print_as_tree()
         self.assertFalse(f.predict_success('http://hal.archives-ouvertes.fr/hal-324581'))
         self.assertTrue(f.predict_success('http://hal.archives-ouvertes.fr/hal-429838/document'))
         self.assertTrue(f.predict_success('http://researchgate.net/publication/482893_erscbderl.pdf'))
         self.assertEqual(f.predict_success('http://eprints.soton.ac.uk/pub/oldcest.pdf'),
                 None)
+
+    def test_autoprune(self):
+        f = URLFilter(
+                prune_delay=0,
+                min_urls_prediction=1,
+                min_urls_prune=5, # with autoprune, higher min_urls_prune are better
+                )
+        for url, success in self.urls:
+            f.add_url(url, success, keep_pruned=True)
+            self.assertTrue(f.t.check_sanity())
+        #f.t.print_as_tree()
+        self.assertFalse(f.predict_success('http://hal.archives-ouvertes.fr/hal-324581'))
+        self.assertTrue(f.predict_success('http://hal.archives-ouvertes.fr/hal-429838/document'))
+        self.assertTrue(f.predict_success('http://researchgate.net/publication/482893_erscbderl.pdf'))
+        self.assertEqual(f.predict_success('http://eprints.soton.ac.uk/pub/oldcest.pdf'),
+                None)
+
+    def test_autoprune_simple(self):
+        f = URLFilter(
+                prune_delay=0,
+                min_urls_prediction=1,
+                min_urls_prune=3,
+                )
+        urls = [
+                ('http://me.com/ba.html',False),
+                ('http://you.com/ba.pdf',False),
+                ('http://me.com/te.pdf',True),
+                ('http://li.com/x.pdf',True),
+                ('http://li.com/y.pdf',True),
+                ('http://li.com/z.pdf',True),
+                ]
+        for url, success in urls:
+            f.add_url(url, success, keep_pruned=True)
+            self.assertTrue(f.t.check_sanity())
+        #f.t.print_as_tree()
+        self.assertTrue(f.predict_success('http://li.com/a.pdf'))
+
+
 
 
 def load_tests(loader, tests, ignore):
