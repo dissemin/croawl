@@ -26,10 +26,10 @@ def prepare_url(url):
     >>> prepare_url(None)
     >>> prepare_url(u'http://bad_/test')
     [u'_', u'b', u'a', u'd', u'_', u'/', u't', u'e', u's', u't']
-    >>> prepare_url(u'http://dx.doi.org/10.3406/1')
-    [u'.org', u'.doi', u'.dx', u'/', u'1', u'0', u'.', u'3', u'4', u'0', u'6', u'/', u'1']
+    >>> prepare_url(u'http://dx.doi.org/10.3406/134')
+    [u'.org', u'.doi', u'.dx', u'/', u'10.3406', u'/', 0]
     >>> prepare_url('http://hdl.handle.net/10985/7376')
-    [u'.net', u'.handle', u'.hdl', u'/', u'1', u'0', u'9', u'8', u'5', u'/', u'7', u'3', u'7', u'6']
+    [u'.net', u'.handle', u'.hdl', u'/', u'10985', u'/', 0]
     """
     if not url:
         return url
@@ -44,7 +44,10 @@ def prepare_url(url):
     # do not tokenize DOIs or HANDLES as the numbers they contain can be significant
     # to guess full text availability
     if match.group(1) == 'dx.doi.org' or match.group(1) == 'hdl.handle.net':
-        url_path = [c for c in match.group(2)]
+        parts = match.group(2).split('/')
+        url_path = ['/']
+        if len(parts) > 1:
+            url_path += [parts[1], '/'] + tokenize_url_path('/'.join(parts[2:]))
     # otherwise, tokenize
     else:
         url_path = tokenize_url_path(match.group(2))

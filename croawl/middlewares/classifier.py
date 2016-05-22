@@ -5,6 +5,7 @@ import logging
 import json
 import psycopg2
 import datetime
+from collections import defaultdict
 
 import scrapy
 from scrapy.http import Request, Response
@@ -13,22 +14,17 @@ from urltheory.urlfilter import *
 from croawl.utils import *
 from croawl.spiders.base_spider import field_mappings
 
-positive_classifications = ['pdf','abs','absft']
+positive_classifications = ['pdf','abs','absft','robots']
 
 derived_classifications = {
-        'nopdf': (False,None,None),
-        'noabs': (False,False,False),
+        'nopdf': (False,None,None,None),
+        'noabs': (False,False,False,None),
         }
 
 
 class ClassifierMiddleware(object):
     def __init__(self, *args, **kwargs):
         super(ClassifierMiddleware, self).__init__(*args, **kwargs)
-        self.trees = {}
-        for cls in positive_classifications:
-            self.trees[cls] = URLFilter()
-            self.trees[cls].load('models/fltr.train%s.pkl' % cls)
-
         try:
             from croawl.settings import CLASSIFIER_DATABASE
             self.conn = psycopg2.connect(**CLASSIFIER_DATABASE)
@@ -37,6 +33,17 @@ class ClassifierMiddleware(object):
             print e
             raise ValueError("Invalid connection parameters")
             self.conn = None
+
+        from_db = True
+        if from_db and self.conn:
+            self.retrain_classifiers()
+        else:
+            self.trees = {}
+            for cls in positive_classifications:
+                self.trees[cls] = URLFilter()
+                self.trees[cls].load('models/filter-%s-from-db.pkl' % cls)
+
+
 
     def update_url_db(self, url, classification):
         """
@@ -54,10 +61,8 @@ class ClassifierMiddleware(object):
         curtime = datetime.datetime.now()
 
         cur = self.conn.cursor()
-        nb_records = cur.execute("UPDATE urls SET (fetched,classification) = (%s,%s) WHERE url = %s", (curtime,classification,url))
-        print nb_records
+        cur.execute("UPDATE urls SET (fetched,classification) = (%s,%s) WHERE url = %s", (curtime,classification,url))
         if not cur.rowcount:
-            print (url,curtime,classification)
             cur.execute("INSERT INTO urls (url,fetched,classification) VALUES (%s,%s,%s)", (url,curtime,classification))
 
     def process_request(self, request, spider):
@@ -75,7 +80,7 @@ class ClassifierMiddleware(object):
         stats.inc_value('classification/matched/'+classification)
 
         flags = ['classified_'+classification]
-        if (classification in ['pdf','absft', 'noabs'] or
+        if (classification in ['pdf','absft', 'noabs','robots'] or
             (classification == 'nopdf' and request.meta['looking_for'] == 'pdf')):
             stats.inc_value('classification/filtered/'+classification)
             return Response(request.url, flags=flags)
@@ -89,11 +94,25 @@ class ClassifierMiddleware(object):
                 return response
 
         classification, metadata = self.classify_document(response)
-        self.update_url_db(request.url, classification)
+        url_history = [request.url]+request.meta.get('redirect_urls',[])
+        for url in url_history:
+            self.update_url_db(url, classification)
         response.flags.append('classified_'+classification)
         if metadata:
             response = response.replace(body=json.dumps(metadata))
+        print "Returning response"
         return response
+
+    def process_exception(self, request, exception, spider):
+        if 'looking_for' not in request.meta:
+            return
+
+        if isinstance(exception, scrapy.exceptions.IgnoreRequest):
+            classification = 'robots'
+            url_history = [request.url]+request.meta.get('redirect_urls',[])
+            for url in url_history:
+                self.update_url_db(url, classification)
+
 
     def classify_url(self, url):
         """
@@ -101,18 +120,87 @@ class ClassifierMiddleware(object):
         """
         success = {cls: t.predict_success(url) for (cls,t) in self.trees.items()}
         logging.info("filtering "+url+": abs=%s, pdf=%s, absft=%s" % (str(success['abs']),str(success['pdf']),str(success['absft'])))
+        return self.successes_to_class(success)
 
-        if success['pdf']:
+    def successes_to_class(self, successes):
+        """
+        Computes the string-based representation of the class based
+        on the output of the classifiers
+        """
+        if successes['robots']:
+            return 'robots'
+        if successes['pdf']:
             return 'pdf'
-        elif success['absft']:
+        elif successes['absft']:
             return 'absft'
-        elif success['abs']:
+        elif successes['abs']:
             return 'abs'
-        elif success['abs'] == False:
+        elif successes['abs'] == False:
             return 'noabs'
-        elif success['pdf'] == False:
+        elif successes['pdf'] == False:
             return 'nopdf'
         return None
+
+    def class_to_successes(self, cls):
+        """
+        Computes the target value of the individual classifiers based
+        on the observed class
+        """
+        successes = {}
+        for clas in positive_classifications:
+            successes[clas] = False
+
+        if cls == 'absft':
+            successes['abs'] = True
+            successes['absft'] = True
+        elif cls == 'abs':
+            successes['abs'] = True
+            successes['absft'] = None
+        elif cls == 'pdf':
+            successes['pdf'] = True
+        elif cls == 'robots':
+            for clas in positive_classifications:
+                successes[clas] = None
+            successes['robots'] = True
+
+        return successes
+
+    def retrain_classifiers(self):
+        """
+        Retrains fresh classifiers from the URL database
+        """
+        # init trees
+        self.trees = {}
+        for cls in positive_classifications:
+            self.trees[cls] = URLFilter(prune_delay=0,min_rate=0.99,
+                    threshold=0.95,min_urls_prediction=20,min_urls_prune=20)
+
+        # add urls
+        self.conn.set_isolation_level(1)
+        cnt = 0
+        stats = defaultdict(int)
+        with self.conn as conn:
+            with conn.cursor(name='dumper') as cur:
+                cur.execute('SELECT url, classification FROM urls;')
+                for row in cur:
+                    url, classification = row
+                    cnt += 1
+                    stats[classification] += 1
+                    successes = self.class_to_successes(classification)
+                    for key, val in successes.items():
+                        if val is not None:
+                            self.trees[key].add_url(url, val)
+
+        self.conn.set_isolation_level(0)
+
+        # prune trees and save them
+        for cls in positive_classifications:
+            print cls
+            self.trees[cls].force_prune()
+            self.trees[cls].save('models/filter-%s-from-db.pkl' % cls)
+
+        print ("%d urls in the train set" % cnt)
+        print stats
 
     def classify_document(self, response):
         """

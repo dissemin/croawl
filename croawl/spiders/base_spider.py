@@ -61,7 +61,7 @@ class BaseSpider(scrapy.Spider):
     name = "base"
 
     def start_requests(self):
-        fname = 'few_urls' #'base_urls.uniq'
+        fname = 'doi_list.txt' #'base_urls.uniq'
         with codecs.open(fname, 'r', 'utf-8') as f:
             for line in f:
                 fields = line.strip().split('\t')

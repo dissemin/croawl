@@ -128,7 +128,7 @@ class URLFilter(object):
             return
         self.t.add_url(tokenized, success=success)
         self.last_prune += 1
-        if self.last_prune >= self.prune_delay:
+        if self.prune_delay and self.last_prune >= self.prune_delay:
             self.force_prune()
 
     def force_prune(self):
