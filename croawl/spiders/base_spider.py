@@ -10,6 +10,8 @@ from urltheory.preftree import *
 from urltheory.tokenizer import *
 from urltheory.urlfilter import *
 
+from croawl.streamshuffle import stream_shuffle
+
 from time import sleep
 
 from oaipmh.client import Client
@@ -64,7 +66,7 @@ field_mappings = {
 class BaseSpider(scrapy.Spider):
     name = "base"
 
-    def start_requests(self):
+    def read_base_records(self):
         registry = MetadataRegistry()
         registry.registerReader('base_dc', base_dc_reader)
         client = Client('http://doai.io/oai', registry)
@@ -78,6 +80,10 @@ class BaseSpider(scrapy.Spider):
                         'splash_url':link,
                         'from_identifier':header.identifier()}
                 yield self.filter_url(link,metadata, looking_for='any')
+
+    def start_requests(self):
+        return stream_shuffle(self.read_base_records(), batch_size=128000,
+                key=(lambda r: r.url if r else ''))
 
     def filter_url(self, url, metadata, looking_for=None):
         try:
