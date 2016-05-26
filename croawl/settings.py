@@ -30,7 +30,11 @@ ROBOTSTXT_OBEY=True
 CONCURRENT_REQUESTS_PER_DOMAIN=1
 #CONCURRENT_REQUESTS_PER_IP=16
 
+CONCURRENT_REQUESTS = 100
+REACTOR_THREADPOOL_MAXSIZE = 20
 DOWNLOAD_MAXSIZE=20971520 # 20MB
+RETRY_ENABLED = False # To speed things up
+DOWNLOAD_TIMEOUT = 10
 
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED=False
@@ -53,7 +57,17 @@ DOWNLOAD_MAXSIZE=20971520 # 20MB
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
+    'croawl.middlewares.classifier.ClassifierMiddleware': 50,
     'scrapy.downloadermiddlewares.robotstxt.RobotsTxtMiddleware': 100,
+}
+
+# URL classifier: database where the classification of downloaded URLs is logged
+CLASSIFIER_DATABASE = {
+        'database':'croawl',
+        'user':'croawl',
+        'password':'croawl',
+        'host':'localhost',
+        'port':5432,
 }
 
 # Enable or disable extensions

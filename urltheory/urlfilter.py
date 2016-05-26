@@ -1,10 +1,11 @@
 # -*- encoding: utf-8 -*-
 from __future__ import unicode_literals
 
+from collections import defaultdict
 from urltheory.preftree import *
 from urltheory.tokenizer import *
 
-import codecs
+import codecs, cPickle
 
 class URLCorpus(object):
     """
@@ -37,12 +38,60 @@ class URLCorpus(object):
             self._write_url((url,success), self.out_sync)
         self.urls.append((url,success))
 
-    def predict_success(self, url):
+    def load(self, fname):
         """
-        Provided for convenience (so that an URLCorpus behaves like a trivial URLFilter)
+        Loads a corpus from a file.
+
+        :param fname: filename of the TSV file to load
         """
-        return None
+        with open(fname, 'r') as f:
+            for line in f:
+                fields = line.strip().split('\t')
+                if len(fields) != 2:
+                    print "Invalid line, %d fields" % len(fields)
+                    continue
+                self.add_url(fields[0], fields[1] == '1')
+
+    def train_filter(self, fltr):
+        """
+        Takes a (preconfigured) filter and feeds it with the 
+        URLs stored in the corpus. The URLFilter is modified in place.
+
+        :param fltr: a URLFilter
+        """
+        for url, success in self.urls:
+            fltr.add_url(url, success)
+
+    def cv_scores(self, fltr, folds=5):
+        """
+        Computes cross-validated scores of a filter.
         
+        :param fltr: the URLFilter to train and score
+        :param folds: the number of folds for cross-validation
+        """
+        batch_length = int(float(len(self.urls))/folds)
+        confusion = {True:defaultdict(int),False:defaultdict(int)}
+        for k in range(folds):
+            test_set = []
+            train_set = []
+            for j in range(folds):
+                cur_batch = self.urls[(k*batch_length):((k+1)*batch_length)]
+                if j == k:
+                    test_set = cur_batch
+                else:
+                    train_set += cur_batch
+            
+            fltr.clear()
+            for url, success in train_set:
+                fltr.add_url(url, success)
+            fltr.force_prune()
+
+            for url, refsuccess in test_set:
+                predsuccess = fltr.predict_success(url)
+                confusion[refsuccess][predsuccess] += 1
+
+        return confusion
+
 
 class URLFilter(object):
     """
@@ -69,7 +118,18 @@ class URLFilter(object):
         self.last_prune = 0
         self.t = PrefTree()
 
-    def add_url(self, url, success=False):
+    def _prune_kwargs(self):
+        """
+        Returns the prune keyword arguments to be passed to
+        PrefTree.prune
+        """
+        return {'reverse':self.reverse,
+                'min_urls':self.min_urls_prune,
+                'min_children':self.min_children,
+                'min_rate':self.min_rate}
+    
+
+    def add_url(self, url, success=False, keep_pruned=True):
         """
         :param url: the URL to add to the filter
         :param success: whether we should consider it successful
@@ -77,21 +137,21 @@ class URLFilter(object):
         tokenized = prepare_url(url)
         if not tokenized:
             return
-        self.t.add_url(tokenized, success=success)
-        self.last_prune += 1
-        if self.last_prune >= self.prune_delay:
-            self.force_prune()
+        
+        if keep_pruned:
+            self.t.add_url(tokenized, success=success, prune_kwargs=self._prune_kwargs())
+        else:
+            self.t.add_url(tokenized, success=success)
+            self.last_prune += 1
+            if self.prune_delay and self.last_prune >= self.prune_delay:
+                self.force_prune()
 
     def force_prune(self):
         """
         Prunes the tree according to the parameters stored in the filter.
         """
-        self.t, pruned = self.t.prune(reverse=self.reverse,
-                min_urls=self.min_urls_prune,
-                min_children=self.min_children,
-                min_rate=self.min_rate)
+        self.t, pruned = self.t.prune(**self._prune_kwargs())
         self.last_prune = 0
-        self.t.print_as_tree()
 
     def predict_success(self, url):
         """
@@ -100,4 +160,26 @@ class URLFilter(object):
         tokenized = prepare_url(url)
         return self.t.predict_success(tokenized, threshold=self.threshold,
                 min_urls=self.min_urls_prediction)
+
+    def clear(self):
+        """
+        Clears the underlying PrefTree (removes all URLs and patterns it contains)
+        """
+        del self.t
+        self.t = PrefTree()
+
+    def load(self, fname):
+        """
+        Loads the URL filter from a file
+        """
+        with open(fname, 'rb') as f:
+            dct = cPickle.load(f)
+            self.__dict__.update(dct)
+
+    def save(self, fname):
+        """
+        Saves the URL filter to a file
+        """
+        with open(fname, 'wb') as f:
+            cPickle.dump(self.__dict__, f) 
 

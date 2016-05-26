@@ -3,3 +3,5 @@ requests
 hashable_collections
 service_identity # to fix a bug in scrapy
 PyPDF2
+psycopg2
+-e git://github.com/wetneb/pyoai.git@base_dc#egg=pyoai # to harvest our OAI-PMH backend
