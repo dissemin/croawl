@@ -77,7 +77,7 @@ class PrefTreeTest(unittest.TestCase):
         self.assertTrue(t.has_wildcard())
         self.assertEqual(t.match('arxiv.org/pdf/1784.1920'), (5,4))
         self.assertEqual(t.match('arxiv.org/pdf/2340.0124'), (0,0))
-        self.assertTrue(t.predict_success('arxiv.org/pdf/1784.1920', threshold=0.6))
+        self.assertTrue(t.predict_success('arxiv.org/pdf/1784.1920', threshold=0.6,min_urls=4))
         t.print_as_tree()
 
     def test_prune_failures(self):
@@ -161,10 +161,11 @@ class PrevPrefTreeTest(unittest.TestCase):
 
 class URLFilterTest(unittest.TestCase):
     def test_predict(self):
-        f = URLFilter(prune_delay=5,min_urls=3)
+        f = URLFilter(prune_delay=5,min_urls_prune=3,min_urls_prediction=3)
         urls = [
             ('http://researchgate.net/publication/233865122_uriset', False),
             ('http://researchgate.net/publication/143874230_albtedru', False),
+            ('http://hal.archives-ouvertes.fr/hal-8495739/document', True),
             ('http://eprints.soton.ac.uk/pub/enrstancs.pdf', True),
             ('http://eprints.soton.ac.uk/pub/enrstancs/abs', False),
             ('http://researchgate.net/publication/233865122_uriset.pdf', True),
@@ -198,3 +199,5 @@ def load_tests(loader, tests, ignore):
     tests.addTests(doctest.DocTestSuite(urltheory.utils))
     return tests
 
+if __name__ == '__main__':
+    unittest.main()

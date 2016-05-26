@@ -1,0 +1,28 @@
+#   A basic travis.yml boilerplate for Django projects
+#
+#   The set-up assumes a postgreSQL database.
+#
+# Taken from https://gist.github.com/ndarville/3625246
+
+language: python
+
+
+python:
+  - 2.7
+
+sudo: false
+
+
+virtualenv:
+  system_site_packages: true
+
+install:
+  - pip install -r requirements.txt
+  - pip install coveralls
+
+script:
+  - coverage run --source=urltheory,croawl urltheory/tests.py -v 2
+
+after_success:
+  - coveralls
+
