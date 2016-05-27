@@ -184,6 +184,28 @@ class PrefTree(object):
             return (self.url_count - urls, self.success_count - successes, [])
         return (0,0, ['<unk>'])
 
+    def print_subtree(self, url):
+        """
+        Print the subtree rooted at the given branch
+        """
+        # ensure we are dealing with a non-flattened list (not a string)
+        if type(url) != list:
+            url = [c for c in url]
+
+        if url == []:
+            self.print_as_tree()
+            return
+
+        for path in self.children:
+            if list(url[:len(path)]) == list(path):
+                self[path].print_subtree(url[len(path):])
+                return
+
+        print "unmatched: "
+        print url
+        self.print_as_tree()
+
+
     def predict_success(self, url, threshold=0.95, min_urls=10):
         """
         Returns True when the number of successes matching this url
