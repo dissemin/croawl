@@ -364,18 +364,19 @@ class RevPrefTree(PrefTree):
     All urls sent to it are reversed.
     See :class:`PrefTree` for the documentation.
     """
-    def add_url(self, url, **kwargs):
+    def add_url(self, url, success=None, **kwargs):
         """
         Recursively adds an URL to the postfix tree
         """
-        super(RevPrefTree, self).add_url(list(reversed(url)), **kwargs)
+        super(RevPrefTree, self).add_url(list(reversed(url)), success=success, **kwargs)
 
-    def match(self, url):
+    def match_with_branch(self, url):
         """
         Returns the number of time this URL was added and the number of time
-        it was a success.
+        it was a success, and the branch of that URL in the tree.
         """
-        return super(RevPrefTree, self).match(list(reversed(url)))
+        tot, suc, branch = super(RevPrefTree, self).match_with_branch(list(reversed(url)))
+        return tot, suc, list(reversed(branch))
 
     def urls(self, prepend=[]):
         """

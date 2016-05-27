@@ -240,9 +240,10 @@ class URLFilterTest(unittest.TestCase):
         for url, success in self.urls:
             f.add_url(url, success, keep_pruned=True)
             self.assertTrue(f.t.check_sanity())
-        #f.t.print_as_tree()
+        f.t.print_as_tree()
         self.assertFalse(f.predict_success('http://hal.archives-ouvertes.fr/hal-324581'))
         self.assertTrue(f.predict_success('http://hal.archives-ouvertes.fr/hal-429838/document'))
+        print f.t.match_with_branch(prepare_url('http://researchgate.net/publication/482893_erscbderl.pdf'))
         self.assertTrue(f.predict_success('http://researchgate.net/publication/482893_erscbderl.pdf'))
         self.assertEqual(f.predict_success('http://eprints.soton.ac.uk/pub/oldcest.pdf'),
                 None)
