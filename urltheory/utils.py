@@ -1,6 +1,17 @@
 # -*- encoding: utf-8 -*-
 from __future__ import unicode_literals
 
+class WildcardCharacter(object):
+    """
+    An object representing a wildcard in a string.
+    This is used to generate the URLs of a :class:`PrefTree`
+    that thas been pruned.
+    This character should not be part of the labels of branches
+    in a tree (use PrefTree.is_wildcard instead).
+    """
+    def __unicode__(self):
+        return '*'
+
 def longest_common_prefix(a,b):
     """
     Computes the longest common prefix of two lists `a` and `b`.

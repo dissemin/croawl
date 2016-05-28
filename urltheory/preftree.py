@@ -87,7 +87,9 @@ class PrefTree(object):
 
     def add_url(self, url, success=None, url_count=1, success_count=0, prune_kwargs=None):
         """
-        Recursively adds an URL to the prefix tree
+        Recursively adds an URL to the prefix tree.
+        Adding an URL with a WilcardCharacter forces the addition of a wildcard in
+        the tree at the designated position.
 
         :param success: boolean: if set to True, url_count, success_count = 1, 1
                         if set to False, url_count, success_count = 1, 0
@@ -133,11 +135,18 @@ class PrefTree(object):
             break
         
         if not found and len(url) > 0 and not self.is_wildcard:
-            # if no internal node with a matching prefix was found
-            # then add a new one with that prefix
-            self[url] = leaf_node
+            found = True
+            # if the url we are trying to add starts with a wildcard
+            if url[0] == WildcardCharacter():
+                # then just convert the tree to a wildcard
+                self.is_wildcard = True
+                self.children.clear()
+            else:
+                # if no internal node with a matching prefix was found
+                # then add a new one with that prefix
+                self[url] = leaf_node
 
-        if prune_kwargs is not None:
+        if found and prune_kwargs is not None:
             # We have added a node to our tree, so we should try to prune (non-recursively)
             kwargs = prune_kwargs.copy()
             kwargs['recurse'] = False
@@ -272,9 +281,7 @@ class PrefTree(object):
 
         # If it is a good candidate for a prune, but has not been pruned,
         # we can try reversing the urls
-        if (reverse and should_be_pruned and
-                not has_been_pruned and not self.has_wildcard()):
-            # we cannot reverse a tree if it already contains a wildcard…
+        if (reverse and should_be_pruned and not has_been_pruned):
             urls = self.urls()
             rev = RevPrefTree()
             for u, match_count, success_count in urls:
@@ -297,7 +304,7 @@ class PrefTree(object):
         """
         if len(self.children) == 0:
             if self.is_wildcard:
-                return [(prepend + ['*'],self.url_count,self.success_count)]
+                return [(prepend + [WildcardCharacter()],self.url_count,self.success_count)]
             return [(prepend,self.url_count,self.success_count)]
         else:
             res = []

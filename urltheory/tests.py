@@ -171,7 +171,7 @@ class PrefTreeTest(unittest.TestCase):
         t2['def'] = t
         self.assertFalse(t2.check_sanity())
 
-class PrevPrefTreeTest(unittest.TestCase):
+class RevPrefTreeTest(unittest.TestCase):
     def test_create(self):
         t = RevPrefTree()
         for url, success in [
@@ -202,6 +202,7 @@ class URLFilterTest(unittest.TestCase):
             ('http://researchgate.net/publication/942758431_plecuste', False),
             ('http://onlinelibrary.wiley.com/wol1/doi/10.1002/anie.200800037.abstract', False),
             ('http://researchgate.net/publication/320748374_kelbcad.pdf', True),
+            ('http://lilliput.ac.uk/~smith/pubs/mypaper.pdf', False),
             ('http://researchgate.net/publication/942758431_plecuste.pdf', True),
             ('http://hal.archives-ouvertes.fr/hal-47198374', False),
             ('http://hal.archives-ouvertes.fr/hal-47198374/document', True),
@@ -219,12 +220,12 @@ class URLFilterTest(unittest.TestCase):
                 prune_delay=5,
                 min_urls_prediction=1,
                 min_urls_prune=3,
-                min_rate=0.7,
+                min_rate=0.8,
                 )
         for url, success in self.urls:
             f.add_url(url, success, keep_pruned=False)
             self.assertTrue(f.t.check_sanity())
-        #f.t.print_as_tree()
+        f.t.print_as_tree()
         self.assertFalse(f.predict_success('http://hal.archives-ouvertes.fr/hal-324581'))
         self.assertTrue(f.predict_success('http://hal.archives-ouvertes.fr/hal-429838/document'))
         self.assertTrue(f.predict_success('http://researchgate.net/publication/482893_erscbderl.pdf'))
