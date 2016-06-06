@@ -9,6 +9,7 @@ import datetime
 from collections import defaultdict
 
 import scrapy
+import twisted
 from scrapy.http import Request, Response
 
 from urltheory.urlfilter import *
@@ -22,6 +23,13 @@ derived_classifications = {
         'noabs': (False,False,False,None),
         }
 
+def less_informative(a, b):
+    """
+    Returns true when the values of classifiers in a are less informative
+    than in b.
+    """
+    return all([ xa is None or xa = xb for (xa,xb) in zip(a,b)])
+
 
 class ClassifierMiddleware(object):
     def __init__(self, *args, **kwargs):
@@ -34,6 +42,11 @@ class ClassifierMiddleware(object):
             print e
             raise ValueError("Invalid connection parameters")
             self.conn = None
+
+        self.retraining = False
+        # probability to download a page even if the classifier
+        # predicts that we do not need to.
+        self.check_prob = 0.1
 
         from_db = True
         if from_db and self.conn:
@@ -83,15 +96,31 @@ class ClassifierMiddleware(object):
         flags = ['classified_'+classification]
         if (classification in ['pdf','absft', 'noabs','robots'] or
             (classification == 'nopdf' and request.meta['looking_for'] == 'pdf')):
+            # in this case, we do not need to download the page
             stats.inc_value('classification/filtered/'+classification)
+
+            # maybe we want to do it anyway just to be sure?
+            if self.check_prob > 0:
+                r = request.url.__hash__() % int(10./self.check_prob)
+                if r < 10:
+                    new_request = request
+                    new_request.flags.append('check_'+classification)
+                    # TODO in classify, check that it is ok
+                    # and retrain if it isn't
+                    return new_request
+    
+            # otherwise, return a dummy response
             return Response(request.url, flags=flags)
 
     def process_response(self, request, response, spider):
         if 'looking_for' not in request.meta:
             return response
 
+        class_to_check = None
         for flag in response.flags:
-            if flag.startswith('classified_'):
+            if flag.startswith('check_'):
+                class_to_check = flag[len('check_'):]
+            elif flag.startswith('classified_'):
                 return response
 
         classification, metadata = self.classify_document(response)
@@ -101,18 +130,25 @@ class ClassifierMiddleware(object):
         response.flags.append('classified_'+classification)
         if metadata:
             response = response.replace(body=json.dumps(metadata))
-        print "Returning response"
         return response
 
     def process_exception(self, request, exception, spider):
         if 'looking_for' not in request.meta:
             return
 
-        if isinstance(exception, scrapy.exceptions.IgnoreRequest):
+        if (isinstance(exception, scrapy.exceptions.IgnoreRequest) or
+            isinstance(exception, twisted.internet.error.TimeoutError)):
+            # these exceptions are raised
+            # - when a request is forbidden by robots.txt
+            # - when the server times out
+            # we all classify it with 'robots' so that we don't try harder
             classification = 'robots'
             url_history = [request.url]+request.meta.get('redirect_urls',[])
             for url in url_history:
                 self.update_url_db(url, classification)
+        else:
+            print "Caught exception:"
+            print type(exception)
 
 
     def classify_url(self, url):
@@ -122,7 +158,7 @@ class ClassifierMiddleware(object):
         t1 = timeit.timeit()
         success = {cls: t.predict_success(url) for (cls,t) in self.trees.items()}
         t2 = timeit.timeit()
-        logging.info("filtering "+url+": abs=%s, pdf=%s in %s" % (str(success['abs']),str(success['pdf'])),str(t2-t1)))
+        logging.info("filtering "+url+": abs=%s, pdf=%s in %s" % (str(success['abs']),str(success['pdf']),str(t2-t1)))
         return self.successes_to_class(success)
 
     def successes_to_class(self, successes):
