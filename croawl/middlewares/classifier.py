@@ -28,7 +28,7 @@ def less_informative(a, b):
     Returns true when the values of classifiers in a are less informative
     than in b.
     """
-    return all([ xa is None or xa = xb for (xa,xb) in zip(a,b)])
+    return all([ xa is None or xa == xb for (xa,xb) in zip(a,b)])
 
 
 class ClassifierMiddleware(object):
@@ -48,7 +48,7 @@ class ClassifierMiddleware(object):
         # predicts that we do not need to.
         self.check_prob = 0.1
 
-        from_db = True
+        from_db = False
         if from_db and self.conn:
             self.retrain_classifiers()
         else:
@@ -104,7 +104,7 @@ class ClassifierMiddleware(object):
                 r = request.url.__hash__() % int(10./self.check_prob)
                 if r < 10:
                     new_request = request
-                    new_request.flags.append('check_'+classification)
+                    #new_request.flags.append('check_'+classification)
                     # TODO in classify, check that it is ok
                     # and retrain if it isn't
                     return new_request
