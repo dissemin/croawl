@@ -70,6 +70,10 @@ CLASSIFIER_DATABASE = {
         'port':5432,
 }
 
+# Proaixy API key
+with open('croawl/proaixy_api_key.txt', 'r') as f:
+    PROAIXY_API_KEY = f.read().strip()
+
 # Enable or disable extensions
 # See http://scrapy.readthedocs.org/en/latest/topics/extensions.html
 #EXTENSIONS = {
