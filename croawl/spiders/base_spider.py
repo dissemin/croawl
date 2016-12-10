@@ -11,6 +11,7 @@ from urltheory.tokenizer import *
 from urltheory.urlfilter import *
 
 from croawl.streamshuffle import stream_shuffle
+from croawl.settings import PROAIXY_API_KEY
 
 from time import sleep
 
@@ -70,6 +71,7 @@ class BaseSpider(scrapy.Spider):
         registry = MetadataRegistry()
         registry.registerReader('base_dc', base_dc_reader)
         client = Client('http://doai.io/oai', registry)
+        client.extra_parameters = {'key':PROAIXY_API_KEY}
         for header, record, _ in client.listRecords(metadataPrefix='base_dc'):
             # only process records for which base was unsure
             if '2' not in record['oa']:
