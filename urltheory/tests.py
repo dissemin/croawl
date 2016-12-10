@@ -123,6 +123,11 @@ class PrefTreeTest(unittest.TestCase):
         self.assertEqual(t.match('sciencedirect.com/paper4.pdf'), (3,0))
         self.assertFalse(t.predict_success('sciencedirect.com/paper4.pdf'))
 
+    def test_prune_empty(self):
+        t = PrefTree()
+        t, pruned = t.prune()
+        self.assertFalse(pruned)
+
     def test_prune_with_reverse(self):
         t = PrefTree()
         for url, success in [

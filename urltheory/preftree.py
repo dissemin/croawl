@@ -253,7 +253,7 @@ class PrefTree(object):
         if min_urls <= 0:
             raise ValueError('Invalid min_urls parameter in PrefTree.prune')
         if self.url_count == 0:
-            return
+            return (self, False)
 
         # Is this a good candidate for a prune ?        
         should_be_pruned = (self.url_count >= min_urls and
