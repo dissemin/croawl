@@ -107,7 +107,8 @@ class PrefTreeTest(unittest.TestCase):
         self.assertTrue(t.has_wildcard())
         self.assertEqual(t.match('arxiv.org/pdf/1784.1920'), (5,4))
         self.assertEqual(t.match('arxiv.org/pdf/2340.0124'), (0,0))
-        self.assertTrue(t.predict_success('arxiv.org/pdf/1784.1920', threshold=0.6, min_urls=3))
+        self.assertTrue(t.predict_success('arxiv.org/pdf/1784.1920',
+            confidence_threshold=0.05))
         t.print_as_tree()
 
     def test_prune_failures(self):
@@ -223,9 +224,9 @@ class URLFilterTest(unittest.TestCase):
     def test_predict(self):
         f = URLFilter(
                 prune_delay=5,
-                min_urls_prediction=1,
                 min_urls_prune=3,
                 min_rate=0.8,
+                threshold=0.2,
                 )
         for url, success in self.urls:
             f.add_url(url, success, keep_pruned=False)
@@ -240,8 +241,8 @@ class URLFilterTest(unittest.TestCase):
     def test_autoprune(self):
         f = URLFilter(
                 prune_delay=0,
-                min_urls_prediction=1,
                 min_urls_prune=5, # with autoprune, higher min_urls_prune are better
+                threshold=0.05,
                 )
         for url, success in self.urls:
             f.add_url(url, success, keep_pruned=True)
@@ -257,8 +258,8 @@ class URLFilterTest(unittest.TestCase):
     def test_autoprune_simple(self):
         f = URLFilter(
                 prune_delay=0,
-                min_urls_prediction=1,
                 min_urls_prune=3,
+                threshold=0.1,
                 )
         urls = [
                 ('http://me.com/ba.html',False),

@@ -1,6 +1,20 @@
 # -*- encoding: utf-8 -*-
 from __future__ import unicode_literals
 
+from math import log
+from urltheory.utils import *
+
+def binary_entropy(p):
+    return -(p*log(p,2)+(1-p)*log(1-p,2))
+
+def confidence(url_count, success_count):
+    """
+    Returns 1 - binary_entropy(smoothed_probability)
+    """
+    smoothed_probability = (1.+success_count)/(2.+url_count)
+    return 1. - binary_entropy(smoothed_probability)
+
+
 class WildcardCharacter(object):
     """
     An object representing a wildcard in a string.

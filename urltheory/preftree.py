@@ -154,20 +154,26 @@ class PrefTree(object):
             if success:
                 self.assign(pruned)
 
-    def match(self, url):
+    def match(self, url, confidence_threshold=None):
         """
         Returns the number of times this URL was added and the number of times
         it was marked as a success.
         
         :returns: a pair of integers
         """
-        tot_count, success_count, _ = self.match_with_branch(url)
+        tot_count, success_count, _ = self.match_with_branch(url,
+                                confidence_threshold=confidence_threshold)
         return (tot_count, success_count)
 
-    def match_with_branch(self, url):
+    def match_with_branch(self, url, confidence_threshold=None):
         """
         As match(), returns the total and success count for a given URL,
         but also the pattern of the branch corresponding to that URL in the tree.
+
+        :para url: the tokenized url to match
+        :para confidence_threshold: a float (if provided). if the
+                classification confidence is above that threshold,
+                stop matching and return the majority vote 
 
         :returns: a tuple: (total_count, success_count, branch)
             where the branch is a list listing all the labels of the branches.
@@ -179,6 +185,13 @@ class PrefTree(object):
         if type(url) != list:
             url = [c for c in url]
 
+        if confidence_threshold:
+            current_confidence = confidence(self.url_count,
+                    self.success_count)
+            print "c: %f" % current_confidence
+            if current_confidence > confidence_threshold:
+                return (self.url_count, self.success_count, ['<early>'])
+
         urls = 0
         successes = 0
         for path in self.children:
@@ -186,7 +199,9 @@ class PrefTree(object):
             urls += subtree.url_count
             successes += subtree.success_count
             if list(url[:len(path)]) == list(path):
-                tot_count, suc_count, sub_branch = subtree.match_with_branch(url[len(path):])
+                tot_count, suc_count, sub_branch = subtree.match_with_branch(
+                        url[len(path):],
+                        confidence_threshold=confidence_threshold)
                 return (tot_count, suc_count, path + sub_branch)
 
         if len(url) == 0:
@@ -215,7 +230,7 @@ class PrefTree(object):
         self.print_as_tree()
 
 
-    def predict_success(self, url, threshold=0.95, min_urls=10):
+    def predict_success(self, url, confidence_threshold=0.95):
         """
         Returns True when the number of successes matching this url
         is positive and above threshold * url_count, which corresponds
@@ -223,13 +238,10 @@ class PrefTree(object):
         Returns False when it predicts a failure, and returns nothing
         when it fails to predict.
         """
-        url_count, success_count = self.match(url)
-        if url_count < min_urls:
-            return None
-        if (url_count > 0 and threshold*url_count <= success_count):
-            return True
-        if (url_count > 0 and (1.-threshold)*url_count >= success_count):
-            return False
+        url_count, success_count = self.match(url, confidence_threshold)
+        c = confidence(url_count, success_count)
+        if c > confidence_threshold:
+            return 2*success_count >= url_count
 
     def prune(self, min_urls=1, min_children=2, min_rate=1., reverse=False, recurse=True):
         """
@@ -399,12 +411,13 @@ class RevPrefTree(PrefTree):
         """
         super(RevPrefTree, self).add_url(list(reversed(url)), success=success, **kwargs)
 
-    def match_with_branch(self, url):
+    def match_with_branch(self, url, **kwargs):
         """
         Returns the number of time this URL was added and the number of time
         it was a success, and the branch of that URL in the tree.
         """
-        tot, suc, branch = super(RevPrefTree, self).match_with_branch(list(reversed(url)))
+        tot, suc, branch = super(RevPrefTree,
+                    self).match_with_branch(list(reversed(url)), **kwargs)
         return tot, suc, list(reversed(branch))
 
     def urls(self, prepend=[]):

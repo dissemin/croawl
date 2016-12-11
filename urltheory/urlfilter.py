@@ -102,8 +102,7 @@ class URLFilter(object):
             min_urls_prune=10,
             min_children=2,
             min_rate=0.9,
-            threshold=0.9,
-            min_urls_prediction=10):
+            threshold=0.9):
         """
         :param prune_delay: the number of added urls between each prune
         """
@@ -113,7 +112,6 @@ class URLFilter(object):
         self.min_children = min_children
         self.min_rate = min_rate
         self.threshold = threshold
-        self.min_urls_prediction = min_urls_prediction
 
         self.last_prune = 0
         self.t = PrefTree()
@@ -158,8 +156,7 @@ class URLFilter(object):
         Predicts the success of a given URL with the prefix tree
         """
         tokenized = prepare_url(url)
-        return self.t.predict_success(tokenized, threshold=self.threshold,
-                min_urls=self.min_urls_prediction)
+        return self.t.predict_success(tokenized, confidence_threshold=self.threshold)
 
     def clear(self):
         """
