@@ -8,8 +8,9 @@ url_scanner = re.Scanner([
     (r'.', lambda s,t: t),
     ])
 
-protocol_re = re.compile(r'^[a-z]*://')
-domain_re = re.compile(r'^([a-zA-Z0-9-.]*)((:[0-9]+)?/.*)$')
+resolver_domains = ['dx.doi.org','doi.org','hdl.handle.net']
+protocol_re = re.compile(r'^([a-z]*:)?//')
+domain_re = re.compile(r'^([a-zA-Z0-9-.]*)((:[0-9]+)?(/.*)?)$')
 def prepare_url(url):
     """
     Prepares a URL to be fed, removing the protocol and reversing the
@@ -17,6 +18,8 @@ def prepare_url(url):
 
     >>> prepare_url(u'http://dissem.in/faq')
     [u'.in', u'.dissem', u'/', u'f', u'a', u'q']
+    >>> prepare_url(u'//gnu.org')
+    [u'.org', u'.gnu']
     >>> prepare_url(u'https://duckduckgo.com/?q=test')
     [u'.com', u'.duckduckgo', u'/', u'?', u'q', u'=', u't', u'e', u's', u't']
     >>> prepare_url(u'http://umas.edu:80/abs')
@@ -43,7 +46,7 @@ def prepare_url(url):
 
     # do not tokenize DOIs or HANDLES as the numbers they contain can be significant
     # to guess full text availability
-    if match.group(1) == 'dx.doi.org' or match.group(1) == 'hdl.handle.net':
+    if match.group(1) in resolver_domains:
         parts = match.group(2).split('/')
         url_path = ['/']
         if len(parts) > 1:
@@ -53,7 +56,6 @@ def prepare_url(url):
         url_path = tokenize_url_path(match.group(2))
 
     return reversed_domain + url_path
-
 
 
 def tokenize_url_path(url):
