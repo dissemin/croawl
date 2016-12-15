@@ -29,6 +29,7 @@ allowed_content_types = [
     'image/x.djvu',
     'image/vnd.djvu',
     'application/postscript',
+    'application/ps',
 ]
 
 acceptable_file_prefixes = [

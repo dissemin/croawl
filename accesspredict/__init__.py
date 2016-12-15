@@ -1,6 +1,9 @@
 # -*- encoding: utf-8 -*-
 from __future__ import unicode_literals
 
+import requests
+from gevent import monkey
+monkey.patch_all(thread=False, select=False)
 
 class AccessPredict(object):
     """

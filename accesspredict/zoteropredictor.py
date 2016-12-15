@@ -6,7 +6,6 @@ import os
 import re
 import binascii
 from .predictor import URLCategoryPredictor
-from .pdfpredictor import PDFPredictor
 
 class ZoteroFullTextPredictor(URLCategoryPredictor):
     """
@@ -16,17 +15,16 @@ class ZoteroFullTextPredictor(URLCategoryPredictor):
     zotero_endpoint = 'http://localhost:1969/web'
     allowed_content_types = re.compile('text/html.*')
 
-    def __init__(self, pdf_predictor=None, **kwargs):
-        super(ZoteroFullTextPredictor, self).__init__(**kwargs)
-        self.pdf_predictor = pdf_predictor or PDFPredictor()
-
     def find_full_text(self, json_resp):
+        if self.spider is None:
+            raise ValueError('No spider has been provided.')
+
         for idx, item in enumerate(json_resp):
             for attachment in item.get('attachments',[]):
                 url = attachment.get('url')
                 if (attachment.get('mimeType') == 'application/pdf'
                     and url
-                    and  self.pdf_predictor.filtered_predict(url)):
+                    and  self.spider.predict('pdf', url)):
                     return True
         return False
 
