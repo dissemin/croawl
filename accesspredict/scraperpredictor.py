@@ -49,7 +49,7 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
         Extract all <meta /> and <a /> links
         """
         for link in root.xpath("//head/link[@rel='alternate']"):
-            yield a.attrib.get('href', '')
+            yield link.attrib.get('href', '')
         for meta in root.xpath('//head/meta'):
             yield meta.attrib.get('content', '')
         for a in root.xpath('//a'):

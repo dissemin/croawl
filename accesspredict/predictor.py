@@ -20,6 +20,12 @@ class URLCategoryPredictor(object):
             if recursion is needed.
         """
         super(URLCategoryPredictor, self).__init__()
+        self.set_spider(spider)
+
+    def set_spider(self, spider):
+        """
+        Binds the predictor to a spider
+        """
         self.spider = spider
 
     def predict_before_filter(self, url, tokenized_url):

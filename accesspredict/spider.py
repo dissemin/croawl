@@ -31,7 +31,7 @@ class Spider(object):
         """
         if class_id in self:
             raise ValueError('We already have a tree for "%s"' % class_id)
-        predictor.spider = self
+        predictor.set_spider(self)
         self.predictors[class_id] = predictor
         if tree is not None and class_id in self.forest:
             raise ValueError('A tree for "%s" already exists.' % class_id)
@@ -92,8 +92,8 @@ class Spider(object):
         post_filter_url_answer = predictor.predict_before_fetch(url, tokenized)
         if post_filter_url_answer is not None:
             # this time the history contains the current url
-            self._update_history_classification(class_id, history, pre_url_answer)
-            return post_url_answer
+            self._update_history_classification(class_id, new_history, post_filter_url_answer)
+            return post_filter_url_answer
 
         # otherwise, fetch and classify manually
         answer = False # by default
