@@ -3,7 +3,8 @@ from __future__ import unicode_literals
 
 import hashable_collections.hashable_collections as hashable
 
-from urltheory.utils import *
+from urltheory import utils
+from urltheory.tokenizer import flatten_to_re
 
 class PrefTree(object):
     """
@@ -85,6 +86,10 @@ class PrefTree(object):
         else:
             del self.children[hashable.hashable_list(key)]
 
+    @property
+    def confidence(self):
+        return utils.confidence(self.url_count, self.success_count)
+
     def add_url(self, url, success=None, url_count=1, success_count=0, prune_kwargs=None):
         """
         Recursively adds an URL to the prefix tree.
@@ -111,7 +116,7 @@ class PrefTree(object):
             return
 
         for key in self.children:
-            lcp = longest_common_prefix(url, key)
+            lcp = utils.longest_common_prefix(url, key)
             if len(lcp) == 0:
                 continue
             if len(lcp) < len(key):
@@ -120,7 +125,7 @@ class PrefTree(object):
                 old_node = self[key]
                 new_node[key[len(lcp):]] = old_node
 
-                new_node[url[len(lcp):]] = leaf_node 
+                new_node[url[len(lcp):]] = leaf_node
 
                 new_node.url_count = old_node.url_count + leaf_node.url_count
                 new_node.success_count = old_node.success_count + leaf_node.success_count
@@ -133,11 +138,11 @@ class PrefTree(object):
                         prune_kwargs=prune_kwargs)
             found = True
             break
-        
+
         if not found and len(url) > 0 and not self.is_wildcard:
             found = True
             # if the url we are trying to add starts with a wildcard
-            if url[0] == WildcardCharacter():
+            if url[0] == utils.WildcardCharacter():
                 # then just convert the tree to a wildcard
                 self.is_wildcard = True
                 self.children.clear()
@@ -158,7 +163,7 @@ class PrefTree(object):
         """
         Returns the number of times this URL was added and the number of times
         it was marked as a success.
-        
+
         :returns: a pair of integers
         """
         tot_count, success_count, _ = self.match_with_branch(url,
@@ -173,7 +178,7 @@ class PrefTree(object):
         :para url: the tokenized url to match
         :para confidence_threshold: a float (if provided). if the
                 classification confidence is above that threshold,
-                stop matching and return the majority vote 
+                stop matching and return the majority vote
 
         :returns: a tuple: (total_count, success_count, branch)
             where the branch is a list listing all the labels of the branches.
@@ -186,9 +191,8 @@ class PrefTree(object):
             url = [c for c in url]
 
         if confidence_threshold:
-            current_confidence = confidence(self.url_count,
+            current_confidence = utils.confidence(self.url_count,
                     self.success_count)
-            print "c: %f" % current_confidence
             if current_confidence > confidence_threshold:
                 return (self.url_count, self.success_count, ['<early>'])
 
@@ -239,52 +243,46 @@ class PrefTree(object):
         when it fails to predict.
         """
         url_count, success_count = self.match(url, confidence_threshold)
-        c = confidence(url_count, success_count)
+        c = utils.confidence(url_count, success_count)
         if c > confidence_threshold:
             return 2*success_count >= url_count
 
-    def prune(self, min_urls=1, min_children=2, min_rate=1., reverse=False, recurse=True):
+    def prune(self, confidence_threshold=1.0, reverse=False, recurse=True):
         """
-        Replaces subtrees where the rate of success is above min_rate
-        or below (1 - min_rate) by a wildcard, with the same url and success
-        counts.
+        Replaces subtrees where the confidence is higher than the
+        threshold by a wildcard, with the same url and success counts.
 
         The function returns a new version of the tree, but the original tree
         might also have been modified.
 
-        :param min_urls: only prune subtrees that have at least `min_urls` urls.
-            This parameter has to be positive.
-        :param min_children: only prune subtrees that have at least that
-            many children.
+        :param confidence_threshold: the confidence above which we should
+            replace subtrees by a wildcard
         :param reverse: try to reverse subtrees when they are good candidates
             for a prune.
         :param recurse: prune the tree recursively
         :returns: a pair: the value of the new pruned tree,
             and a boolean indicating whether some part of the tree has been pruned
         """
-        if min_urls <= 0:
-            raise ValueError('Invalid min_urls parameter in PrefTree.prune')
+        if confidence_threshold <= 0:
+            raise ValueError('The confidence threshold has to be positive.')
         if self.url_count == 0:
             return (self, False)
 
-        # Is this a good candidate for a prune ?        
-        should_be_pruned = (self.url_count >= min_urls and
-                len(self.children) >= min_children)
+        # Is this a good candidate for a prune ?
+        should_be_pruned = (self.confidence >= confidence_threshold and
+                            len(self.children) > 0)
         has_been_pruned = False
-        
+
         success_rate = float(self.success_count)/self.url_count
-        if should_be_pruned and (
-                (success_rate >= min_rate) or
-                (success_rate <= 1. - min_rate)):
+        if should_be_pruned:
             self.is_wildcard = True
             self.children.clear()
             has_been_pruned = True
-        
+
         if recurse:
             for path in self.children:
-                new_child, child_pruned = self.children[path].prune(min_urls=min_urls,
-                                        min_children=min_children,
-                                        min_rate=min_rate,
+                new_child, child_pruned = self.children[path].prune(
+                                        confidence_threshold=confidence_threshold,
                                         reverse=reverse,
                                         recurse=True)
                 if child_pruned:
@@ -293,19 +291,18 @@ class PrefTree(object):
 
         # If it is a good candidate for a prune, but has not been pruned,
         # we can try reversing the urls
-        if (reverse and should_be_pruned and not has_been_pruned):
+        if (reverse and not has_been_pruned):
             urls = self.urls()
             rev = RevPrefTree()
             for u, match_count, success_count in urls:
                 rev.add_url(u, url_count=match_count, success_count=success_count)
 
-            rev, pruned = rev.prune(min_urls=min_urls, min_children=min_children,
-                    min_rate=min_rate, reverse=False, recurse=True)
+            rev, pruned = rev.prune(confidence_threshold=confidence_threshold,
+                     reverse=False, recurse=True)
             if pruned:
                 return (rev, True)
 
         return (self, has_been_pruned)
-
 
     def urls(self, prepend=[]):
         """
@@ -316,7 +313,7 @@ class PrefTree(object):
         """
         if len(self.children) == 0:
             if self.is_wildcard:
-                return [(prepend + [WildcardCharacter()],self.url_count,self.success_count)]
+                return [(prepend + [utils.WildcardCharacter()],self.url_count,self.success_count)]
             return [(prepend,self.url_count,self.success_count)]
         else:
             res = []
@@ -345,21 +342,86 @@ class PrefTree(object):
                 return True
         return False
 
-    def print_as_tree(self, level=0, last_label='ROOT'):
+    def print_as_tree(self, levels=[], last_label='ROOT', is_last_child=True):
         """
         Prints the tree as it is stored
         """
-        pipes = ''
-        if level > 0:
-            pipes = ((level-1)*'| ')+'|-'
+        pipes = (''.join(levels) + ('└─' if is_last_child else '├─'))
+        children_levels = levels + ['  ' if is_last_child else '│ ']
 
         if len(self.children) == 0:
             if self.is_wildcard:
                 last_label += '*'
-        print (pipes+last_label+(' (%d/%d)'%
-            (self.success_count,self.url_count))).encode('utf-8')
-        for key, val in self.children.items():
-            val.print_as_tree(level+1, last_label=flatten(key))
+
+        # compute the color of the label
+        color = '\033[30;1m%s\033[0m'
+        if self.url_count:
+            rate = float(self.success_count) / self.url_count
+            if rate > 0.9:
+                color = '\033[32;7m%s\033[0m'
+            elif rate > 0.1:
+                color = '\033[33;7m%s\033[0m'
+        count_label = color % ('(%d/%d)' %
+                    (self.success_count, self.url_count))
+        if type(last_label) == str:
+            last_label = last_label.decode('utf-8')
+
+        print (pipes+last_label+(' '+count_label)).encode('utf-8')
+
+        nb_children = len(self.children)
+        for i, (key, val) in enumerate(self.children.items()):
+            val.print_as_tree(children_levels,
+                             last_label=utils.flatten(key),
+                              is_last_child=(i==nb_children-1))
+
+    def _generate_regex_internal(self, confidence_threshold=0.9,
+                            reverse=False):
+        """
+        Internal function regex generation
+        """
+        if len(self.children) == 0:
+            if (2*self.success_count < self.url_count or
+                self.confidence < confidence_threshold):
+                return ''
+            else:
+                return '.*' if self.is_wildcard else ''
+
+        children_regexes = [
+            child.generate_regex(confidence_threshold, branch, reverse)
+            for branch, child in self.children.items()
+        ]
+        filtered_children = filter(lambda u: bool(u),
+                                    children_regexes)
+
+        children_disjunct = str('|').join(filtered_children)
+        if len(filtered_children) > 1:
+            children_disjunct = str('(%s)') % children_disjunct
+        return children_disjunct
+
+    def generate_regex(self, confidence_threshold=0.9,
+                            leading_branch=[],
+                            reverse=False):
+        """
+        Creates a regular expression that matches strings which
+        match successful branches of the tree, with a confidence
+        higher than the threshold.
+
+        This regular expression should then be completed
+        with "^" and "$" markers.
+
+        The regular expression matching only the empty string
+        is treated as matching the empty language.
+        """
+        internal_re = self._generate_regex_internal(
+                confidence_threshold, reverse)
+        if not internal_re:
+            return ''
+
+        leading_re = flatten_to_re(leading_branch, reverse=reverse)
+        if reverse:
+            return internal_re + leading_re
+        else:
+            return leading_re + internal_re
 
     def check_sanity(self, nonempty=False):
         """
@@ -374,7 +436,7 @@ class PrefTree(object):
         keys = list(self.children.keys())
         for i in range(len(keys)):
             for j in range(i):
-                if longest_common_prefix(keys[i],keys[j]):
+                if utils.longest_common_prefix(keys[i],keys[j]):
                     return False
 
         # 2 / Check that the number of urls and successes are consistent
@@ -382,12 +444,12 @@ class PrefTree(object):
         num_success_children = sum([c.success_count for c in self.children.values()])
         num_leaf_urls = self.url_count - num_url_children
         num_leaf_successes = self.success_count - num_success_children
-        if not (num_leaf_urls >= 0 and 
+        if not (num_leaf_urls >= 0 and
                 num_leaf_successes >= 0 and
                 num_leaf_successes <= num_leaf_urls and
                 (not nonempty or self.url_count > 0)):
             return False
-        
+
         # 3 / A wildcard has no children
         if self.is_wildcard and len(keys):
             return False
@@ -430,14 +492,35 @@ class RevPrefTree(PrefTree):
                 super(RevPrefTree, self).urls()]
         return [(prepend+url,c,s) for url, c, s in reversed_urls]
 
-    def print_as_tree(self, level=0, last_label='ROOT'):
+    def print_as_tree(self, levels=[], last_label='ROOT', is_last_child=True):
         """
         Prints the postfix tree as a prefix tree, adding warnings
         to show that it is in fact a postfix tree
         """
-        pipes = ''
-        if level > 0:
-            pipes = ((level-1)*'| ')+'|-'
-        print pipes+'<< reversed'
-        super(RevPrefTree, self).print_as_tree(level, last_label)
+        last_label = '\033[31;7mreversed\033[0m %s' % last_label
+        super(RevPrefTree, self).print_as_tree(levels, last_label, is_last_child)
 
+    def generate_regex(self, confidence_threshold=0.9,
+                            leading_branch=[],
+                            reverse=False):
+        """
+        Creates a regular expression that matches strings which
+        match successful branches of the tree, with a confidence
+        higher than the threshold.
+
+        This regular expression should then be completed
+        with "^" and "$" markers.
+
+        The regular expression matching only the empty string
+        is treated as matching the empty language.
+        """
+        internal_re = self._generate_regex_internal(
+                confidence_threshold, not reverse)
+        if not internal_re:
+            return ''
+
+        leading_re = flatten_to_re(leading_branch, reverse=reverse)
+        if reverse:
+            return internal_re + leading_re
+        else:
+            return leading_re + internal_re

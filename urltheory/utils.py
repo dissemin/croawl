@@ -51,14 +51,16 @@ def flatten(lst):
     Flattens a list of strings into a string.
 
     >>> flatten([])
-    u''
+    ''
     >>> flatten([u'a',u'b'])
     u'ab'
     >>> flatten([1,3,5])
-    u'135'
+    '135'
     """
-    res = ''
+    res = str('')
     for x in lst:
-        res += unicode(x)
+        if type(x) == int:
+            x = str(x)
+        res += x
     return res
 

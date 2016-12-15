@@ -61,7 +61,7 @@ class PrefTreeTest(unittest.TestCase):
                 ]
         for u, s in urls:
             t.add_url(u, s)
-        t, pruned = t.prune(min_rate=0.9, min_children=2,min_urls=1)
+        t, pruned = t.prune(confidence_threshold=0.1)
 
         c, s, b = t.match_with_branch('aab/t/lu')
         self.assertEqual((c,s),(2,2))
@@ -85,14 +85,10 @@ class PrefTreeTest(unittest.TestCase):
         self.assertEqual(t.match(prepare_url('eprint.iacr.org/2014/528.pdf')), (2,2))
         self.assertEqual(t.match(prepare_url('eprint.iacr.org/2014/528')), (2,0))
 
-    def test_prune_empty_tree(self):
-        t = PrefTree()
-        t.prune() # should not raise anything
-
     def test_prune(self):
         t = PrefTree()
         with self.assertRaises(ValueError):
-            t.prune(min_urls=0)
+            t.prune(confidence_threshold=0)
 
         for url, success in [
                 ('arxiv.org/pdf/1410.1234', True),
@@ -100,16 +96,29 @@ class PrefTreeTest(unittest.TestCase):
                 ('arxiv.org/pdf/1201.5480', True),
                 ('arxiv.org/pdf/1601.01234', True),
                 ('arxiv.org/pdf/1602.01i34', False), # oops
+                ('gnu.org/about.html', False),
                 ]:
             t.add_url(url, success)
-        t, pruned = t.prune(min_rate=0.75,min_children=2,min_urls=1)
-        self.assertEqual(len(t.urls()), 1)
+        t, pruned = t.prune(confidence_threshold=0.05)
+        t.print_as_tree()
+        self.assertEqual(len(t.urls()), 2)
         self.assertTrue(t.has_wildcard())
         self.assertEqual(t.match('arxiv.org/pdf/1784.1920'), (5,4))
         self.assertEqual(t.match('arxiv.org/pdf/2340.0124'), (0,0))
         self.assertTrue(t.predict_success('arxiv.org/pdf/1784.1920',
             confidence_threshold=0.05))
-        t.print_as_tree()
+
+        self.assertEqual(t.generate_regex(
+                confidence_threshold=0.05), 'arxiv\.org\/pdf\/1.*')
+
+    def test_no_prune(self):
+        t = PrefTree()
+        t.add_url('gnu.org/about.html', False)
+        t.add_url('arxiv.org/pdf/1234.6789', True)
+        t.add_url('zenodo.org/record/1278/', True)
+        t, pruned = t.prune(confidence_threshold=0.3)
+        self.assertFalse(pruned)
+        self.assertFalse(t.has_wildcard())
 
     def test_prune_failures(self):
         t = PrefTree()
@@ -120,9 +129,10 @@ class PrefTreeTest(unittest.TestCase):
                 ('mysciencework.com/paper9.pdf', True),
                 ('mysciencework.com/paper8.pdf', False)]:
             t.add_url(url, success)
-        t, pruned = t.prune(min_rate=0.95, min_children=2, min_urls=2)
+        t, pruned = t.prune(confidence_threshold=0.2)
         self.assertEqual(t.match('sciencedirect.com/paper4.pdf'), (3,0))
-        self.assertFalse(t.predict_success('sciencedirect.com/paper4.pdf'))
+        self.assertEqual(t.predict_success('sciencedirect.com/paper4.pdf',
+                        confidence_threshold=0.2), False)
 
     def test_prune_empty(self):
         t = PrefTree()
@@ -177,6 +187,25 @@ class PrefTreeTest(unittest.TestCase):
         t2['def'] = t
         self.assertFalse(t2.check_sanity())
 
+    def test_regex(self):
+        t = PrefTree()
+        for url, success in [
+            ('researchgate.net/publication/233865122_uriset', False),
+            ('researchgate.net/publication/143874230_albtedru', False),
+            ('researchgate.net/publication/320748374_kelbcad', False),
+            ('researchgate.net/publication/233865122_uriset.pdf', True),
+            ('researchgate.net/publication/143874230_albtedru.pdf', True),
+            ('researchgate.net/publication/320748374_kelbcad.pdf', True),
+            ('erudit.org/get_file?name=test.pdf', False),
+            ('erudit.org/get_file?name=document.pdf', False),
+            ('erudit.org/get_file?name=article.pdf', False),
+            ]:
+            t.add_url(url, success)
+        t, pruned = t.prune(confidence_threshold=0.2, reverse=True)
+        t.print_as_tree()
+        self.assertEqual(t.generate_regex(confidence_threshold=0.2),
+                        'researchgate\.net\/publication\/.*\.pdf')
+
 class RevPrefTreeTest(unittest.TestCase):
     def test_create(self):
         t = RevPrefTree()
@@ -189,94 +218,11 @@ class RevPrefTreeTest(unittest.TestCase):
             ('researchgate.net/publication/320748374_kelbcad.pdf', True),
             ]:
             t.add_url(url, success)
-        t, pruned = t.prune()
-        t.print_as_tree()
+        t, pruned = t.prune(confidence_threshold=0.1)
         self.assertEqual(len(t.urls()), 4)
         self.assertEqual(t.match('researchgate.net/publication/7489168_lopdetu.pdf'),
                 (3,3))
-
-class URLFilterTest(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(URLFilterTest, self).__init__(*args, **kwargs)
-        self.urls = [
-            ('http://researchgate.net/publication/233865122_uriset', False),
-            ('http://researchgate.net/publication/143874230_albtedru', False),
-            ('http://hal.archives-ouvertes.fr/hal-8495739/document', True),
-            ('http://eprints.soton.ac.uk/pub/enrstancs.pdf', True),
-            ('http://eprints.soton.ac.uk/pub/enrstancs/abs', False),
-            ('http://researchgate.net/publication/233865122_uriset.pdf', True),
-            ('http://researchgate.net/publication/942758431_plecuste', False),
-            ('http://onlinelibrary.wiley.com/wol1/doi/10.1002/anie.200800037.abstract', False),
-            ('http://researchgate.net/publication/320748374_kelbcad.pdf', True),
-            ('http://lilliput.ac.uk/~smith/pubs/mypaper.pdf', False),
-            ('http://researchgate.net/publication/942758431_plecuste.pdf', True),
-            ('http://hal.archives-ouvertes.fr/hal-47198374', False),
-            ('http://hal.archives-ouvertes.fr/hal-47198374/document', True),
-            ('http://onlinelibrary.wiley.com/wol1/doi/10.1002/anie.200800037.pdf', False),
-            ('http://researchgate.net/publication/617445243_bcldecry', False),
-            ('http://researchgate.net/publication/320748374_kelbcad', False),
-            ('http://hal.archives-ouvertes.fr/hal-3281748', False),
-            ('http://hal.archives-ouvertes.fr/hal-0492738/document', True),
-            ('http://researchgate.net/publication/143874230_albtedru.pdf', True),
-            ('http://researchgate.net/publication/617445243_bcldecry.pdf', True),
-            ]
-
-    def test_predict(self):
-        f = URLFilter(
-                prune_delay=5,
-                min_urls_prune=3,
-                min_rate=0.8,
-                threshold=0.2,
-                )
-        for url, success in self.urls:
-            f.add_url(url, success, keep_pruned=False)
-            self.assertTrue(f.t.check_sanity())
-        f.t.print_as_tree()
-        self.assertFalse(f.predict_success('http://hal.archives-ouvertes.fr/hal-324581'))
-        self.assertTrue(f.predict_success('http://hal.archives-ouvertes.fr/hal-429838/document'))
-        self.assertTrue(f.predict_success('http://researchgate.net/publication/482893_erscbderl.pdf'))
-        self.assertEqual(f.predict_success('http://eprints.soton.ac.uk/pub/oldcest.pdf'),
-                None)
-
-    def test_autoprune(self):
-        f = URLFilter(
-                prune_delay=0,
-                min_urls_prune=5, # with autoprune, higher min_urls_prune are better
-                threshold=0.05,
-                )
-        for url, success in self.urls:
-            f.add_url(url, success, keep_pruned=True)
-            self.assertTrue(f.t.check_sanity())
-        f.t.print_as_tree()
-        self.assertFalse(f.predict_success('http://hal.archives-ouvertes.fr/hal-324581'))
-        self.assertTrue(f.predict_success('http://hal.archives-ouvertes.fr/hal-429838/document'))
-        print f.t.match_with_branch(prepare_url('http://researchgate.net/publication/482893_erscbderl.pdf'))
-        self.assertTrue(f.predict_success('http://researchgate.net/publication/482893_erscbderl.pdf'))
-        self.assertEqual(f.predict_success('http://eprints.soton.ac.uk/pub/oldcest.pdf'),
-                None)
-
-    def test_autoprune_simple(self):
-        f = URLFilter(
-                prune_delay=0,
-                min_urls_prune=3,
-                threshold=0.1,
-                )
-        urls = [
-                ('http://me.com/ba.html',False),
-                ('http://you.com/ba.pdf',False),
-                ('http://me.com/te.pdf',True),
-                ('http://li.com/x.pdf',True),
-                ('http://li.com/y.pdf',True),
-                ('http://li.com/z.pdf',True),
-                ]
-        for url, success in urls:
-            f.add_url(url, success, keep_pruned=True)
-            self.assertTrue(f.t.check_sanity())
-        #f.t.print_as_tree()
-        self.assertTrue(f.predict_success('http://li.com/a.pdf'))
-
-
-
+        self.assertEqual(t.generate_regex(confidence_threshold=0.1), '.*\.pdf')
 
 def load_tests(loader, tests, ignore):
     tests.addTests(doctest.DocTestSuite(urltheory.tokenizer))
