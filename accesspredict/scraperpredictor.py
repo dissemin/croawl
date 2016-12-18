@@ -86,6 +86,8 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
                 if (attachment.get('mimeType') == 'application/pdf'
                     and url
                     and  self.spider.predict('pdf', url)):
+                    print "found pdf:"
+                    print url
                     return True
         return False
 

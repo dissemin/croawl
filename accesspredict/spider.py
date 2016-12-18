@@ -7,6 +7,7 @@ import random
 import requests
 from requests.models import REDIRECT_STATI
 from accesspredict.utils import normalize_outgoing_url
+from accesspredict.statistics import CrawlingStatistics
 
 crawler_user_agent = 'http://dissem.in/'
 
@@ -14,13 +15,20 @@ class Spider(object):
     """
     Holds an URL forest and a set of associated predictors.
     """
-    def __init__(self, forest=None, dataset=None):
+    def __init__(self, forest=None, dataset=None, stats=None):
         self.forest = forest or URLForest()
         self.dataset = dataset # We don't necessarily need a dataset
         self.predictors = {}
+        self.stats = stats or CrawlingStatistics()
 
     def __contains__(self, key):
         return key in self.predictors
+
+    def incr(self, key):
+        """
+        Shortcut to increment statistics
+        """
+        self.stats.increment(key)
 
     def add_predictor(self, class_id, predictor, tree=None):
         """
@@ -38,7 +46,13 @@ class Spider(object):
         elif class_id not in self.forest:
             self.forest.add_tree(class_id, tree)
 
-    def predict(self, class_id, url, history=[], referer=None):
+        # init the stats for this class
+        if self.stats:
+            for key in ['incoming','cached','pre_filter','post_filter','filtered',
+                        'requested','redirected','learned']:
+                self.stats.add_key('%s:%s' % (class_id,key))
+
+    def predict(self, class_id, url, history=[], referer=None, force=False):
         """
         Predicts the membership of an URL to a class.
 
@@ -49,19 +63,23 @@ class Spider(object):
                 as a list of (url, tokenized). These URLs should
                 only be accumulated as the result of HTTP redirects.
         :param referer: any referer to provide as a header
+        :param force: bypass the cache and tree
         """
         if class_id not in self:
             raise ValueError('No predictor for class "%s".' % class_id)
         predictor = self.predictors[class_id]
+
+        self.incr(class_id+':incoming')
 
         # Coerce to unicode
         if type(url) != unicode:
             url = url.decode('utf-8')
 
         # Normalize the URL and check if we haven't checked it yet
-        if self.dataset is not None:
+        if self.dataset is not None and not force:
             previous_result = self.dataset.get_if_recent(url, class_id)
             if previous_result is not None:
+                self.incr(class_id+':cached')
                 return previous_result
 
         tokenized = tokenizer.prepare_url(url)
@@ -75,15 +93,19 @@ class Spider(object):
             # method. But, we want to update the URLs in the history
             # because they involved making expensive HTTP requests.
             self._update_history_classification(class_id, history, pre_url_answer)
+            self.incr(class_id+':pre_filter')
             return pre_url_answer
 
         # then check if the prefix tree predicts
         # a category
-        answer = self._get_preftree_answer(class_id, tokenized)
+        answer = None
+        if not force:
+            answer = self._get_preftree_answer(class_id, tokenized)
 
         if answer is not None:
             print "## skipped %s" % url
             print "   answer: %s" % unicode(answer)
+            self.incr(class_id+':filtered')
             return answer
 
         new_history = history + [(url, tokenized)]
@@ -93,6 +115,7 @@ class Spider(object):
         if post_filter_url_answer is not None:
             # this time the history contains the current url
             self._update_history_classification(class_id, new_history, post_filter_url_answer)
+            self.incr(class_id+':post_filter')
             return post_filter_url_answer
 
         # otherwise, fetch and classify manually
@@ -108,6 +131,8 @@ class Spider(object):
             }
             if referer:
                 headers['Referer'] = referer
+
+            self.incr(class_id+':requested')
 
             print "## fetching %s" % url
             if predictor.head_mode:
@@ -126,7 +151,9 @@ class Spider(object):
                     raise requests.exceptions.TooManyRedirects()
 
                 next_url = normalize_outgoing_url(r.url, next_url)
-                return self.predict(class_id, next_url, new_history)
+                self.incr(class_id+':redirected')
+                return self.predict(class_id, next_url, new_history,
+                                    force=force, referer=referer)
 
             # classify manually
             answer = predictor.predict_after_fetch(r, url, tokenized)
@@ -145,6 +172,7 @@ class Spider(object):
         status
         """
         for url, tokenized in history:
+            self.incr(class_id+':learned')
             if self.dataset is not None:
                 self.dataset.set(url, class_id, status)
             # TODO: this involves acquiring and releasing many times

@@ -7,3 +7,6 @@
 *.swo
 # Json
 out.json
+# output
+data/
+www/
