@@ -169,13 +169,24 @@ class PrefTreeTest(unittest.TestCase):
         del t[hashable_list('biorxiv.org/')]
         del t['sciencedirect.com/']
 
+    def test_init(self):
+        with self.assertRaises(ValueError):
+            PrefTree(url_count=-1)
+
+        with self.assertRaises(ValueError):
+            PrefTree(success_count=-1)
+
+        with self.assertRaises(ValueError):
+            PrefTree(url_count=1, success_count=2)
+
     def test_check_sanity(self):
         t = PrefTree()
         t['abc'] = PrefTree()
         t['aa'] = PrefTree()
         self.assertFalse(t.check_sanity())
 
-        t = PrefTree(url_count=-1)
+        t = PrefTree(url_count=0)
+        t.url_count = -1
         self.assertFalse(t.check_sanity())
 
         t = PrefTree()

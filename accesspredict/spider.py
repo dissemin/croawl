@@ -2,8 +2,8 @@
 from __future__ import unicode_literals
 from .forest import URLForest
 from urltheory.utils import confidence
+from urltheory.utils import proba_confidence
 from urltheory import tokenizer
-import random
 import requests
 from requests.models import REDIRECT_STATI
 from accesspredict.utils import normalize_outgoing_url
@@ -52,18 +52,21 @@ class Spider(object):
                         'requested','redirected','learned']:
                 self.stats.add_key('%s:%s' % (class_id,key))
 
-    def predict(self, class_id, url, history=[], referer=None, force=False):
+    def predict(self, class_id, url, history=[], referer=None, min_confidence=0.8):
         """
         Predicts the membership of an URL to a class.
 
         :param class_id: the class membership to test for
         :param url: the URL to classify
-        :param force: ignore the current URL filter
         :param history: history of previous requests, input
                 as a list of (url, tokenized). These URLs should
                 only be accumulated as the result of HTTP redirects.
         :param referer: any referer to provide as a header
-        :param force: bypass the cache and tree
+        :param min_confidence: discard cached or inferred results with a
+                confidence lower than this threshold, and ask
+                the classifier to return a result with a better
+                confidence. Setting this parameter to anything above one
+                should force all downloads involved.
         """
         if class_id not in self:
             raise ValueError('No predictor for class "%s".' % class_id)
@@ -76,16 +79,19 @@ class Spider(object):
             url = url.decode('utf-8')
 
         # Normalize the URL and check if we haven't checked it yet
-        if self.dataset is not None and not force:
+        if self.dataset is not None:
             previous_result = self.dataset.get_if_recent(url, class_id)
             if previous_result is not None:
-                self.incr(class_id+':cached')
-                return previous_result
+                previous_confidence = proba_confidence(previous_result)
+                if previous_confidence > min_confidence:
+                    self.incr(class_id+':cached')
+                    return previous_result
 
         tokenized = tokenizer.prepare_url(url)
 
         # first check if it's obvious from the URL
-        pre_url_answer = predictor.predict_before_filter(url, tokenized)
+        pre_url_answer = predictor.predict_before_filter(url, tokenized,
+                                min_confidence=min_confidence)
         if pre_url_answer is not None:
             # In this case, the classification is obvious from the url.
             # There is no point in adding this particular URL to the
@@ -96,22 +102,20 @@ class Spider(object):
             self.incr(class_id+':pre_filter')
             return pre_url_answer
 
-        # then check if the prefix tree predicts
-        # a category
-        answer = None
-        if not force:
-            answer = self._get_preftree_answer(class_id, tokenized)
+        # then check if the prefix tree predicts a category
+        answer = self._get_preftree_answer(class_id, tokenized, min_confidence)
 
-        if answer is not None:
+        if answer is not None and proba_confidence(answer) > min_confidence:
             print "## skipped %s" % url
-            print "   answer: %s" % unicode(answer)
+            print "   answer: %f" % answer
             self.incr(class_id+':filtered')
             return answer
 
         new_history = history + [(url, tokenized)]
 
         # check again from the URL, allowing for longer (cached) checks
-        post_filter_url_answer = predictor.predict_before_fetch(url, tokenized)
+        post_filter_url_answer = predictor.predict_before_fetch(url, tokenized,
+                    min_confidence=min_confidence)
         if post_filter_url_answer is not None:
             # this time the history contains the current url
             self._update_history_classification(class_id, new_history, post_filter_url_answer)
@@ -153,10 +157,10 @@ class Spider(object):
                 next_url = normalize_outgoing_url(r.url, next_url)
                 self.incr(class_id+':redirected')
                 return self.predict(class_id, next_url, new_history,
-                                    force=force, referer=referer)
+                            min_confidence=min_confidence, referer=referer)
 
             # classify manually
-            answer = predictor.predict_after_fetch(r, url, tokenized)
+            answer = predictor.predict_after_fetch(r, url, tokenized, min_confidence)
         except requests.exceptions.RequestException:
             pass
         except UnicodeDecodeError:
@@ -180,26 +184,24 @@ class Spider(object):
             # that acquires the lock only once.
             self.forest.add_url(class_id, tokenized, status)
 
-    def _get_preftree_answer(self, class_id, tokenized):
+    def _get_preftree_answer(self, class_id, tokenized, min_confidence):
         """
         Given a tokenized URL, returns
         a boolean if the prefix tree predicts
         a class, or None if a manual classification is
         needed
         """
-        threshold = 0.7 + 0.3*random.random()
-
         url_count, success_count = self.forest.match(class_id,
-            tokenized, confidence_threshold=threshold)
+            tokenized, maximum_confidence=True)
 
         if not url_count:
             return None
 
         obtained_confidence = confidence(url_count, success_count)
-        print "threshold: %f" % threshold
+        print "threshold: %f" % min_confidence
         print "count: %d/%d" % (success_count, url_count)
         print "confidence: %f" % obtained_confidence
-        if obtained_confidence > threshold:
+        if obtained_confidence > min_confidence:
             return 2*success_count >= url_count
 
 

@@ -41,21 +41,24 @@ class PDFPredictor(URLCategoryPredictor):
     min_pages = 3
     max_pdf_size = 1024*1024*50
 
-    def predict_after_fetch(self, request, url, tokenized):
+    def predict_after_fetch(self, request, url, tokenized, min_confidence=0.8):
         """
-        Parses the PDF file
+        Parses the PDF file.
+
+        :para min_confidence: ignored because this predictor only returns
+                                0 or 1, which have confidence 1
         """
         with contextlib.closing(request) as request:
             try:  # We try to extract the first page of the PDF
                 if (int(request.headers.get('content-length', 0)) >
                     self.max_pdf_size):
-                    return False
+                    return 0.
 
                 # check that the content-type looks legit
                 content_type = request.headers.get('content-type')
                 if not any(content_type.startswith(c)
                             for c in allowed_content_types):
-                    return False
+                    return 0.
 
                 for chunk in request.iter_content(chunk_size=1024):
                     data = chunk
@@ -63,7 +66,7 @@ class PDFPredictor(URLCategoryPredictor):
                     if compressed:
                         d = zlib.decompressobj(zlib.MAX_WBITS|32)
                         data = d.decompress(chunk, 32)
-                    return acceptable_file_start_re.match(data) is not None
+                    return float(acceptable_file_start_re.match(data) is not None)
 
                 # Old code that downloads the whole PDF and parses it
                 #f = StringIO(request.content)
@@ -73,7 +76,7 @@ class PDFPredictor(URLCategoryPredictor):
             except (ValueError, zlib.error) as e:
                 print e
                 # PyPDF2 failed (maybe it believes the file is encrypted…)
-                return False
+                return 0.
 
 
 
@@ -85,17 +88,16 @@ class PDFPredictorTest(unittest.TestCase):
         self.assertEqual(value, expected)
 
     def test_pdf(self):
-        self.test_url('https://arxiv.org/pdf/1611.07004.pdf', True)
+        self.test_url('https://arxiv.org/pdf/1611.07004.pdf', 1.)
 
     def test_psgz(self):
-        self.test_url('http://cds.cern.ch/record/682079/files/larg-96-064.ps.gz', True)
+        self.test_url('http://cds.cern.ch/record/682079/files/larg-96-064.ps.gz', 1.)
 
     def test_djvu(self):
-        self.test_url('http//bibliotekacyfrowa.eu/Content/25196/027048-0001.djvu', True)
+        self.test_url('http//bibliotekacyfrowa.eu/Content/25196/027048-0001.djvu', 1.)
 
     def test_html(self):
-        self.test_url('http://www.die-bonn.de/id/17041_p1/about/html/?lang=de', False)
+        self.test_url('http://www.die-bonn.de/id/17041_p1/about/html/?lang=de', 0.)
 
     def test_targz(self):
-        self.test_url('http://gdac.broadinstitute.org/runs/analyses__2014_07_15/data/PAAD-TP/20140715/gdac.broadinstitute.org_PAAD-TP.mRNAseq_Clustering_CNMF.Level_4.2014071500.0.0.tar.gz',
-False)
+        self.test_url('http://gdac.broadinstitute.org/runs/analyses__2014_07_15/data/PAAD-TP/20140715/gdac.broadinstitute.org_PAAD-TP.mRNAseq_Clustering_CNMF.Level_4.2014071500.0.0.tar.gz', 0.)

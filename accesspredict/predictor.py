@@ -5,9 +5,11 @@ class URLCategoryPredictor(object):
     """
     Predictor for a particular category (e.g. PDF files)
 
-    The k parameter controls how often we fetch the content
-    of the URL for checking. The higher it is, the more often
-    we check.
+    Each prediction method can be passed a `min_confidence`
+    parameter. This parameter determines how hard we should
+    try classifying the URL: each method should only return
+    a classification probability if its confidence is higher
+    than this threshold.
     """
     # perform requests in stream mode
     stream_mode = True
@@ -28,9 +30,9 @@ class URLCategoryPredictor(object):
         """
         self.spider = spider
 
-    def predict_before_filter(self, url, tokenized_url):
+    def predict_before_filter(self, url, tokenized_url, min_confidence=0.8):
         """
-        To be overriden by the actual classification code.
+        To be overriden by   the actual classification code.
         This method should not fetch the URL: it should only
         return a boolean when the content of the URL can
         be classified from the URL itself.
@@ -42,13 +44,15 @@ class URLCategoryPredictor(object):
 
         :param url: the URL to classify
         :param tokenized_url: a tokenized version of the URL
-        :returns: a boolean indicating if the document belongs
+        :param min_confidence: only return a classification if the
+                    confidence exceeds this threshold
+        :returns: the probability of the document belonging
                  to the category, or None if we can't tell from
                  the URL only
         """
         return None
 
-    def predict_before_fetch(self, url, tokenized_url):
+    def predict_before_fetch(self, url, tokenized_url, min_confidence=0.8):
         """
         To be overriden by the actual classification code.
         This method can be more heavy than predict_before_filter
@@ -56,7 +60,9 @@ class URLCategoryPredictor(object):
 
         :param url: the URL to classify
         :param tokenized_url: a tokenized version of the URL
-        :returns: a boolean indicating if the document belongs
+        :param min_confidence: only return a classification if the
+                    confidence exceeds this threshold
+        :returns: the probability of the document belonging
                  to the category, or None if we can't tell from
                  the URL only
         """
@@ -69,8 +75,10 @@ class URLCategoryPredictor(object):
         :param request: the request we have used to fetch it
         :param url: the original URL we tried to fetch
         :param tokenized: the tokenized version of that URL
-        :returns: a boolean indicating if the document
-                  belongs to the category.
+        :param min_confidence: only return a classification if the
+                    confidence exceeds this threshold
+        :returns: the probability of the document
+                  belonging to the category.
         """
         return False
 

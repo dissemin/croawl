@@ -25,7 +25,7 @@ class URLDataset(object):
         if not val:
             return
         fields = val.split(':')
-        return (fields[0] == 'T', fields[1])
+        return (float(fields[0]), fields[1])
 
     def get_if_recent(self, url, class_id, ttl=timedelta(days=6*30)):
         """
@@ -48,8 +48,8 @@ class URLDataset(object):
         If a date string is not provided, it will be set to today.
         """
         url = normalize_url(url)
-        val = '%s:%s' % (
-                'T' if value else 'F',
+        val = '%f:%s' % (
+                 value,
                  datestring or date.today().isoformat())
         self.client.hset(class_id, url, val)
 
@@ -62,7 +62,7 @@ class URLDataset(object):
                 fields = line.strip().split('\t')
                 day = fields[0]
                 class_id = fields[1]
-                value = fields[2] == 'T'
+                value = float(fields[2])
                 url = fields[3]
                 self.set(url, class_id, value, day)
 
@@ -90,8 +90,9 @@ class URLDataset(object):
         """
         for item in self.client.hscan_iter(class_id):
             url, redis_val = item
-            val = redis_val[0] == 'T'
-            datestamp = redis_val[2:]
+            parsed = redis_val.split(':')
+            val = float(parsed[0])
+            datestamp = parsed[1]
             yield (url, val, datestamp)
 
     def _iterate_classes(self):
@@ -107,6 +108,6 @@ class URLDataset(object):
         with open(fname, 'w') as f:
             for class_id in self._iterate_classes():
                 for (url, val, datestamp) in self._iterate_urls(class_id):
-                    val = str('T' if val else 'F')
+                    val = str(val)
                     f.write(str('\t').join([datestamp, class_id, val, url])+str('\n'))
 

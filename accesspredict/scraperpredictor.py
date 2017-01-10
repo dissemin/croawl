@@ -14,7 +14,7 @@ from .pdfpredictor import allowed_content_types as pdf_content_types
 from .pdfpredictor import acceptable_file_start_re as pdf_file_start_re
 
 identifiers_re = re.compile(
-    r'(10\.[0-9]{4,}[^ ]*/[^ &]+|[0-9][0-9._\-/]+[0-9])')
+    r'(10\.[0-9]{4,}[^ ]*/[^ &]+|[0-9][0-9._\-/:]+[0-9])')
 
 
 class ScraperFullTextPredictor(URLCategoryPredictor):
@@ -76,22 +76,8 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
             yield new_url
 
 
-    def find_full_text(self, json_resp):
-        if self.spider is None:
-            raise ValueError('No spider has been provided.')
-
-        for idx, item in enumerate(json_resp):
-            for attachment in item.get('attachments',[]):
-                url = attachment.get('url')
-                if (attachment.get('mimeType') == 'application/pdf'
-                    and url
-                    and  self.spider.predict('pdf', url)):
-                    print "found pdf:"
-                    print url
-                    return True
-        return False
-
-    def predict_after_fetch(self, request, url, tokenized):
+    def predict_after_fetch(self, request, url, tokenized,
+                            min_confidence=0.8):
         """
         Tries to find a sensible PDF link.
         """
@@ -100,7 +86,7 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
             content_type.startswith(c)
             for c in self.allowed_content_types)
         if not content_type_allowed:
-            return False
+            return 0.
 
         if content_type.startswith('text/html'):
             links = self.extract_good_links(url, request.content)
@@ -110,10 +96,12 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
                 print l
             print "~~~"
 
-            return any(self.spider.predict('pdf', pdf_url, referer=url)
-                        for pdf_url in links)
+            return max([0.0]+
+                       [self.spider.predict('pdf', pdf_url,
+                       referer=url, min_confidence=min_confidence)
+                        for pdf_url in links])
         else: # we are dealing with a candidate PDF file
             for chunk in request.iter_content(chunk_size=1024):
-                return pdf_file_start_re.match(chunk) is not None
+                return float(pdf_file_start_re.match(chunk) is not None)
 
 

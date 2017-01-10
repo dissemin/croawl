@@ -26,28 +26,29 @@ class PrefTree(object):
     - `url_count`, the number of URLs it was generated from (one
       for each leaf, and an arbitrary number for each wildcard)
     - `success_count`, the number of successes among these urls,
-      which has to be less
+       which has to be less. Note that it can actually be a floating
+       point number, if floats were passed when constructing the
+       tree.
 
     The keys of children in internal nodes are required not
     to share any common prefix (if so, we need to refactor them
     by adding an intermediate internal node) and to be non-null.
     """
 
-    def __init__(self, url_count=0, success_count=0, success=None):
+    def __init__(self, url_count=0, success_count=0):
         """
         Creates a leaf.
 
         :param url_count: the number of urls leading to that leaf
         :param success_count: the number of successful urls leading to that leaf
-        :param success: if True, sets both url_count and success_count to 1
         """
         self.children = {}
-        if success is True:
-            success_count = 1
-            url_count = 1
-        elif success is False:
-            success_count = 0
-            url_count = 1
+        if not url_count >= 0:
+            raise ValueError('Invalid url count, must be nonnegative')
+        if not success_count >= 0:
+            raise ValueError('Invalid success count, must be nonnegative')
+        if url_count < success_count:
+            raise ValueError('url count has to be greater than success count')
         self.url_count = url_count
         self.success_count = success_count
         self.is_wildcard = False
@@ -90,24 +91,29 @@ class PrefTree(object):
     def confidence(self):
         return utils.confidence(self.url_count, self.success_count)
 
-    def add_url(self, url, success=None, url_count=1, success_count=0, prune_kwargs=None):
+    def add_url(self, url, success_count=0., url_count=1., prune_kwargs=None):
         """
         Recursively adds an URL to the prefix tree.
         Adding an URL with a WilcardCharacter forces the addition of a wildcard in
         the tree at the designated position.
 
-        :param success: boolean: if set to True, url_count, success_count = 1, 1
-                        if set to False, url_count, success_count = 1, 0
+        :param success_count: number of successful urls matching this
+                            pattern. Can be any nonnegative float.
+                            Booleans are converted to integers.
         :param url_count: custom number of urls matching this pattern
-        :param success_count: custom number of successful urls matching this pattern
         :param prune_kwargs: should we simultaneously keep the tree pruned? if so,
             this parameter should contain the dict of parameters used by prune()
             (passed as **kwargs).
         """
         found = False
 
-        leaf_node = PrefTree(success=success, url_count=url_count,
-                success_count=success_count)
+        # convert boolean or integer values to floats
+        if type(success_count) != float:
+            success_count = float(success_count)
+        if type(url_count) != float:
+            url_count = float(url_count)
+
+        leaf_node = PrefTree(url_count=url_count, success_count=success_count)
         self.url_count += leaf_node.url_count
         self.success_count += leaf_node.success_count
 
@@ -133,7 +139,7 @@ class PrefTree(object):
                 self[lcp] = new_node
             else: # in this case, len(lcp) == len(key)
                 # Recursively add the url to the next internal node
-                self.children[key].add_url(url[len(lcp):], success=success,
+                self.children[key].add_url(url[len(lcp):],
                         url_count=url_count, success_count=success_count,
                         prune_kwargs=prune_kwargs)
             found = True
@@ -159,7 +165,7 @@ class PrefTree(object):
             if success:
                 self.assign(pruned)
 
-    def match(self, url, confidence_threshold=None):
+    def match(self, url, maximum_confidence=False):
         """
         Returns the number of times this URL was added and the number of times
         it was marked as a success.
@@ -167,18 +173,21 @@ class PrefTree(object):
         :returns: a pair of integers
         """
         tot_count, success_count, _ = self.match_with_branch(url,
-                                confidence_threshold=confidence_threshold)
+                                maximum_confidence=maximum_confidence)
         return (tot_count, success_count)
 
-    def match_with_branch(self, url, confidence_threshold=None):
+    def match_with_branch(self, url, maximum_confidence=False):
         """
         As match(), returns the total and success count for a given URL,
         but also the pattern of the branch corresponding to that URL in the tree.
 
         :para url: the tokenized url to match
-        :para confidence_threshold: a float (if provided). if the
-                classification confidence is above that threshold,
-                stop matching and return the majority vote
+        :para maximum_confidence: if set to true, instead of returning
+                the counts for the leaf of the tree that matches the URL,
+                we return the counts for the node in the branch with
+                maximum confidence. This provides a form of
+                generalization, by effectively ignoring the second
+                part of the branch (after that most confident node).
 
         :returns: a tuple: (total_count, success_count, branch)
             where the branch is a list listing all the labels of the branches.
@@ -190,26 +199,37 @@ class PrefTree(object):
         if type(url) != list:
             url = [c for c in url]
 
-        if confidence_threshold:
-            current_confidence = utils.confidence(self.url_count,
-                    self.success_count)
-            if current_confidence > confidence_threshold:
-                return (self.url_count, self.success_count, ['<early>'])
+        current_confidence = utils.confidence(self.url_count,
+                self.success_count)
+
 
         urls = 0
         successes = 0
         for path in self.children:
             subtree = self[path]
+
+            # we keep track of the counts seen in the children,
+            # so that we can substract them later on to the root counts
+            # if the url ends at the root
             urls += subtree.url_count
             successes += subtree.success_count
+
             if list(url[:len(path)]) == list(path):
+                # we found a matching branch
                 tot_count, suc_count, sub_branch = subtree.match_with_branch(
                         url[len(path):],
-                        confidence_threshold=confidence_threshold)
-                return (tot_count, suc_count, path + sub_branch)
+                        maximum_confidence=maximum_confidence)
+                sub_confidence = utils.confidence(tot_count, suc_count)
+                if not maximum_confidence or sub_confidence > current_confidence:
+                    return (tot_count, suc_count, path + sub_branch)
+                else:
+                    return (self.url_count, self.success_count, [])
 
         if len(url) == 0:
+            # the url ends here
             return (self.url_count - urls, self.success_count - successes, [])
+
+        # the url did not match anything in the tree.
         return (0,0, ['<unk>'])
 
     def print_subtree(self, url):
@@ -361,7 +381,7 @@ class PrefTree(object):
                 color = '\033[32;7m%s\033[0m'
             elif rate > 0.1:
                 color = '\033[33;7m%s\033[0m'
-        count_label = color % ('(%d/%d)' %
+        count_label = color % ('(%.1f/%.1f)' %
                     (self.success_count, self.url_count))
         if type(last_label) == str:
             last_label = last_label.decode('utf-8')
@@ -467,11 +487,13 @@ class RevPrefTree(PrefTree):
     All urls sent to it are reversed.
     See :class:`PrefTree` for the documentation.
     """
-    def add_url(self, url, success=None, **kwargs):
+    def add_url(self, url, success_count=False, url_count=1):
         """
         Recursively adds an URL to the postfix tree
         """
-        super(RevPrefTree, self).add_url(list(reversed(url)), success=success, **kwargs)
+        super(RevPrefTree, self).add_url(list(reversed(url)),
+            success_count=success_count,
+            url_count=url_count)
 
     def match_with_branch(self, url, **kwargs):
         """

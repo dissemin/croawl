@@ -15,20 +15,23 @@ class ZoteroFullTextPredictor(URLCategoryPredictor):
     zotero_endpoint = 'http://localhost:1969/web'
     allowed_content_types = re.compile('text/html.*')
 
-    def find_full_text(self, json_resp):
+    def find_full_text(self, json_resp, min_confidence):
         if self.spider is None:
             raise ValueError('No spider has been provided.')
+
+        probas = [0.]
 
         for idx, item in enumerate(json_resp):
             for attachment in item.get('attachments',[]):
                 url = attachment.get('url')
                 if (attachment.get('mimeType') == 'application/pdf'
-                    and url
-                    and  self.spider.predict('pdf', url)):
-                    return True
-        return False
+                    and url):
+                    probas.append(self.spider.predict('pdf', url,
+                                min_confidence=min_confidence))
+        return max(probas)
 
-    def predict_after_fetch(self, request, url, tokenized):
+    def predict_after_fetch(self, request, url, tokenized,
+                            min_confidence=0.8):
         """
         Checks that the content-type is plausible and sends
         the URL to the Zotero instance
@@ -40,7 +43,7 @@ class ZoteroFullTextPredictor(URLCategoryPredictor):
         content_type_allowed = self.allowed_content_types.match(
             request.headers.get('content-type', 'unknown'))
         if not content_type_allowed:
-            return False
+            return 0.
 
         try:
             r = requests.post(self.zotero_endpoint,
@@ -51,5 +54,4 @@ class ZoteroFullTextPredictor(URLCategoryPredictor):
             return self.find_full_text(json_resp)
         except (ValueError, requests.exceptions.RequestException) as e:
             print e
-            return False
-
+            return 0.

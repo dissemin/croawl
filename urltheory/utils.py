@@ -5,14 +5,23 @@ from math import log
 from urltheory.utils import *
 
 def binary_entropy(p):
+    if p <= 0. or p >= 1.:
+        return 0.
     return -(p*log(p,2)+(1-p)*log(1-p,2))
+
+def proba_confidence(p):
+    """
+    Returns the confidence of a probability:
+    1. - binary_entropy(p)
+    """
+    return 1. - binary_entropy(p)
 
 def confidence(url_count, success_count):
     """
     Returns 1 - binary_entropy(smoothed_probability)
     """
     smoothed_probability = (1.+success_count)/(2.+url_count)
-    return 1. - binary_entropy(smoothed_probability)
+    return proba_confidence(smoothed_probability)
 
 
 class WildcardCharacter(object):

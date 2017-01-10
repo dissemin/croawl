@@ -6,10 +6,11 @@ class CombinedPredictor(URLCategoryPredictor):
     """
     Boolean combination of predictors
     """
-    def predict_before_fetch(self, url, tokenized_url):
-        return self._val(url)
+    def predict_before_fetch(self, url, tokenized_url,
+                min_confidence=0.8):
+        return self._val(url, min_confidence)
 
-    def _val(self, url):
+    def _val(self, url, min_confidence):
         """
         This is the method where the boolean combination should be
         computed
@@ -44,8 +45,9 @@ class P(CombinedPredictor):
             self.class_id = class_id
             self.negated = False
 
-    def _val(self, url):
-        return self.negated != self.spider.predict(self.class_id, url)
+    def _val(self, url, min_confidence):
+        upstream_proba = self.spider.predict(self.class_id, url, min_confidence)
+        return 1. - upstream_proba if self.negated else upstream_proba
 
     def __unicode__(self):
         return 'P(%s)' % self.class_id
@@ -62,26 +64,59 @@ class BinaryCombinedPredictor(CombinedPredictor):
         self.p1.set_spider(spider)
         self.p2.set_spider(spider)
 
+    def _val(self, url, min_confidence):
+        """
+        Combines the probabilities output by p1 and p2
+        into the proba of the compound, by calling
+        p1 and p2 with the appropriate min_confidence
+        """
+        upstream_min_conf = self.upstream_min_confidence(self, min_confidence)
+        x1 = self.p1._val(url, upstream_min_conf)
+        x2 = self.p2._val(url, upstream_min_conf)
+        return self.combine_probas(x1, x2)
+
+    def upstream_min_confidence(self, min_confidence):
+        """
+        To be reimplemented: computes the confidence with which
+        child classifiers should be called.
+        """
+        raise NotImplemented()
+
+    def combine_probas(self, x1, x2):
+        """
+        To be reimplemented: combines the outputs of the
+        two children.
+        """
+        raise NotImplemented()
+
     def __unicode__(self):
         return ' '.join([unicode(self.p1), self.operator, unicode(self.p2)])
 
 class EqualCombinedPredictor(BinaryCombinedPredictor):
     operator = '=='
-    def _val(self, url):
-        return self.p1._val(url) == self.p2._val(url)
+    def combine_probas(self, x1, x2):
+        return x1*x2 + (1 - x1)*(1 - x2)
+    def upstream_min_confidence(self, c):
+        return (1. + sqrt(1. - 2.*(1.-c)))/2.
 
 class NotEqualCombinedPredictor(BinaryCombinedPredictor):
     operator = '!='
-    def _val(self, url):
-        return self.p1._val(url) != self.p2._val(url)
+    def combine_probas(self, x1, x2):
+        return x1*(1 - x2) + (1 - x1)*x2
+    def upstream_min_confidence(self, c):
+        return (1. + sqrt(1. - 2.*(1.-c)))/2
 
 class AndCombinedPredictor(BinaryCombinedPredictor):
     operator = '&'
-    def _val(self, url):
-        return self.p1._val(url) and self.p2._val(url)
+    def combine_probas(self, x1, x2):
+        return x1*x2
+    def upstream_min_confidence(self, c):
+        return sqrt(c)
 
 class OrCombinedPredictor(BinaryCombinedPredictor):
     operator = '|'
-    def _val(self, url):
-        return self.p1._val(url) or self.p2._val(url)
+    def combine_probas(self, x1, x2):
+        return x1 + x2 - x1*x2
+    def upstream_min_confidence(self, c):
+        return sqrt(c)
 
