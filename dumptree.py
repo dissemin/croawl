@@ -8,11 +8,9 @@ from accesspredict.spider import *
 from accesspredict.urldataset import URLDataset
 
 from gevent.pool import Pool
-import redis
+from config import redis_client
 import sys
 
-
-client = redis.StrictRedis(host='localhost', port=6379, db=5)
 
 uf = URLForest()
 uf.add_tree('pdf')
@@ -20,8 +18,7 @@ uf.add_tree('pdf')
 uf.add_tree('custom')
 #uf.add_tree('diff')
 
-ud = URLDataset(client)
-ud.save('dataset.tsv')
+ud = URLDataset(redis_client)
 
 ud.feed_to_forest(uf)
 
