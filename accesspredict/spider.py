@@ -20,6 +20,7 @@ class Spider(object):
         self.dataset = dataset # We don't necessarily need a dataset
         self.predictors = {}
         self.stats = stats or CrawlingStatistics()
+        self.smoothing = {}
 
     def __contains__(self, key):
         return key in self.predictors
@@ -30,12 +31,14 @@ class Spider(object):
         """
         self.stats.increment(key)
 
-    def add_predictor(self, class_id, predictor, tree=None):
+    def add_predictor(self, class_id, predictor, smoothing, tree=None):
         """
         Adds a predictor for the given class_id
         The tree identified by class_id from the forest will be
         used, unless there is none, in which case the tree provided
         will be used.
+
+        :param smoothing: the smoothing value (pair of floats) for this predictor
         """
         if class_id in self:
             raise ValueError('We already have a tree for "%s"' % class_id)
@@ -45,6 +48,8 @@ class Spider(object):
             raise ValueError('A tree for "%s" already exists.' % class_id)
         elif class_id not in self.forest:
             self.forest.add_tree(class_id, tree)
+
+        self.smoothing[class_id] = smoothing
 
         # init the stats for this class
         if self.stats:
@@ -67,6 +72,7 @@ class Spider(object):
                 the classifier to return a result with a better
                 confidence. Setting this parameter to anything above one
                 should force all downloads involved.
+        :returns: the (smoothed) probability that the url belongs to the class
         """
         if class_id not in self:
             raise ValueError('No predictor for class "%s".' % class_id)
@@ -113,7 +119,7 @@ class Spider(object):
 
         new_history = history + [(url, tokenized)]
 
-        # check again from the URL, allowing for longer (cached) checks
+        # check again from the URL, allowing for longer (because cached by us) checks
         post_filter_url_answer = predictor.predict_before_fetch(url, tokenized,
                     min_confidence=min_confidence)
         if post_filter_url_answer is not None:
@@ -197,7 +203,7 @@ class Spider(object):
         if not url_count:
             return None
 
-        obtained_confidence = confidence(url_count, success_count)
+        obtained_confidence = confidence(url_count, success_count, self.smoothing[class_id])
         print "threshold: %f" % min_confidence
         print "count: %d/%d" % (success_count, url_count)
         print "confidence: %f" % obtained_confidence

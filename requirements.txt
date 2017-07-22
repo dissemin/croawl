@@ -1,4 +1,5 @@
 gevent
+redis
 requests
 hashable_collections
 service_identity # to fix a bug in scrapy

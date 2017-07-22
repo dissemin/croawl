@@ -16,11 +16,30 @@ def proba_confidence(p):
     """
     return 1. - binary_entropy(p)
 
-def confidence(url_count, success_count):
+def confidence(url_count, success_count, smoothing=(1.,1.)):
     """
     Returns 1 - binary_entropy(smoothed_probability)
+
+    :param smoothing: A pair of floats for the smoothing (succes,failure)
+
+    >>> confidence(10, 5)
+    0.0
+    >>> confidence(10, 0, smoothing=(0.,0.))
+    1.0
+    >>> confidence(10, 0, smoothing=(0.,1.))
+    1.0
+    >>> int(confidence(10, 0, smoothing=(2.,2.))*10)
+    4
+    >>> int(confidence(10, 9)*10)
+    3
+    >>> confidence(10, 9) == confidence(10, 1)
+    True
+    >>> confidence(0, 0)
+    0.0
     """
-    smoothed_probability = (1.+success_count)/(2.+url_count)
+    if url_count < 1:
+        return 0.
+    smoothed_probability = (smoothing[0]+success_count)/(smoothing[0]+smoothing[1]+url_count)
     return proba_confidence(smoothed_probability)
 
 
