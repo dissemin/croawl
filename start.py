@@ -10,12 +10,12 @@ from accesspredict.combinedpredictor import P
 from accesspredict.statistics import CrawlingStatistics
 
 from gevent.pool import Pool
+from config import redis_client
 import gevent
 import redis
 
 
-client = redis.StrictRedis(host='localhost', port=6379, db=5)
-client.flushall()
+#redis_client.flushall()
 
 uf = URLForest()
 uf.add_tree('pdf')
@@ -23,7 +23,7 @@ uf.add_tree('custom')
 #uf.add_tree('zotero')
 #uf.add_tree('diff')
 
-ud = URLDataset(client)
+ud = URLDataset(redis_client)
 # this loads up all the cached URLs we have in redis
 ud.feed_to_forest(uf)
 
@@ -64,4 +64,4 @@ update_stats(crawler_greenlet)
 
 ud.save('data/%s/dataset.tsv'% dumpname)
 uf.save('data/%s/forest.pkl'% dumpname)
-a
+

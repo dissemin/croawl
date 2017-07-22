@@ -1,7 +1,9 @@
 # Python
 .virtualenv
+.venv
 *.pyc
 .coverage
+config.py
 # Vim
 *.swp
 *.swo
