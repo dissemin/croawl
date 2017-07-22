@@ -33,8 +33,8 @@ dumpname = 'crossref.train'
 #dumpname = 'pdftest'
 
 spider = Spider(forest=uf, dataset=ud, stats=stats)
-spider.add_predictor('pdf', PDFPredictor())
-spider.add_predictor('custom', ScraperFullTextPredictor())
+spider.add_predictor('pdf', PDFPredictor(), (1.,4.))
+spider.add_predictor('custom', ScraperFullTextPredictor(), (5.,5.))
 #spider.add_predictor('zotero', ZoteroFullTextPredictor())
 #spider.add_predictor('diff', P('custom') != (P('zotero') | P('pdf')))
 

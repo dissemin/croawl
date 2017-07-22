@@ -92,3 +92,63 @@ def flatten(lst):
         res += x
     return res
 
+def inverse_proba_confidence(c):
+    """
+    Computes the inverse of the proba_confidence,
+    in [0.5,1]
+
+    >>> int(round(100*inverse_proba_confidence(proba_confidence(0.8))))
+    80
+    """
+    return 1. - inverse_binary_entropy(1. - c)
+
+def inverse_binary_entropy(e, epsilon=0.000001):
+    """
+    Computes the inverse of the binary entropy,
+    in [0,0.5]
+
+    >>> int(round(100*inverse_binary_entropy(0.)))
+    0
+    >>> int(round(100*inverse_binary_entropy(binary_entropy(0.3423))))
+    34
+    """
+    start = 0
+    end = 0.5
+    while (end - start) > epsilon:
+        midpoint = (start+end)/2
+        b = binary_entropy(midpoint)
+        if b < e:
+            start = midpoint
+        elif b > e:
+            end = midpoint
+        else:
+            return midpoint
+    return midpoint
+
+def min_count_for_confidence(confidence_threshold, smoothing):
+    """
+    Given a confidence threshold and the smoothing parameters
+    (as a pair of floats), return the minimum number of
+    observed classifications to return a confident estimation.
+
+    >>> min_count_for_confidence(proba_confidence(0.95), (1.,4.))
+    0
+    """
+    r = inverse_proba_confidence(confidence_threshold)
+    alpha, beta = smoothing
+    return ((alpha + beta)*r - alpha)/(1-r)
+
+def smoothing_for_min_counts(confidence_threshold, min_count_success, min_count_failure):
+    """
+    Given the min counts for full success and full failure experiments,
+    return the appropriate smoothing parameters.
+    """
+    r = inverse_proba_confidence(confidence_threshold)
+    rr = r/(1-r)
+    denom = 1 - rr*rr
+    ca = min_count_success
+    cb = min_count_failure
+    alpha = (ca - rr*cb)/denom
+    beta = (cb - rr*ca)/denom
+    return (alpha, beta)
+
