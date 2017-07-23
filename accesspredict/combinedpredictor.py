@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 
 from .predictor import URLCategoryPredictor
+from math import sqrt
 
 class CombinedPredictor(URLCategoryPredictor):
     """

@@ -1,8 +1,6 @@
 # -*- encoding: utf-8 -*-
 
-
 from math import log
-from urltheory.utils import *
 
 def binary_entropy(p):
     if p <= 0. or p >= 1.:
@@ -15,33 +13,6 @@ def proba_confidence(p):
     1. - binary_entropy(p)
     """
     return 1. - binary_entropy(p)
-
-def confidence(url_count, success_count, smoothing=(1.,1.)):
-    """
-    Returns 1 - binary_entropy(smoothed_probability)
-
-    :param smoothing: A pair of floats for the smoothing (succes,failure)
-
-    >>> confidence(10, 5)
-    0.0
-    >>> confidence(10, 0, smoothing=(0.,0.))
-    1.0
-    >>> confidence(10, 0, smoothing=(0.,1.))
-    1.0
-    >>> int(confidence(10, 0, smoothing=(2.,2.))*10)
-    4
-    >>> int(confidence(10, 9)*10)
-    3
-    >>> confidence(10, 9) == confidence(10, 1)
-    True
-    >>> confidence(0, 0)
-    0.0
-    """
-    if url_count < 1:
-        return 0.
-    smoothed_probability = (smoothing[0]+success_count)/(smoothing[0]+smoothing[1]+url_count)
-    return proba_confidence(smoothed_probability)
-
 
 class WildcardCharacter(object):
     """

@@ -25,6 +25,16 @@ class SmoothingStrategy(object):
         """
         raise NotImplemented
 
+class NoSmoothing(SmoothingStrategy):
+    """
+    No smoothing at all, just returns bare probability estimates.
+
+    >>> NoSmoothing().evaluate(5,4,3)
+    0.8
+    """
+    def evaluate(self, count, success, length):
+        return float(success)/count
+
 class ConstantDirichlet(SmoothingStrategy):
     """
     Put the same Dirichlet prior on the distribution of

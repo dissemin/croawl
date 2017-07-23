@@ -1,7 +1,6 @@
 # -*- encoding: utf-8 -*-
 
 from .forest import URLForest
-from urltheory.utils import confidence
 from urltheory.utils import proba_confidence
 from urltheory import tokenizer
 import requests

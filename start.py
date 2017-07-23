@@ -9,7 +9,7 @@ from accesspredict.spider import *
 from accesspredict.urldataset import URLDataset
 from accesspredict.combinedpredictor import P
 from accesspredict.statistics import CrawlingStatistics
-from accesspredict.smoothing import ExponentialDirichlet
+from urltheory.smoothing import ExponentialDirichlet
 
 from gevent.pool import Pool
 from config import redis_client

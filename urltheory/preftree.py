@@ -5,6 +5,8 @@ import hashable_collections.hashable_collections as hashable
 
 from urltheory import utils
 from urltheory.tokenizer import flatten_to_re
+from urltheory.smoothing import ConstantDirichlet
+from urltheory.utils import proba_confidence
 
 class PrefTree(object):
     """
@@ -87,9 +89,6 @@ class PrefTree(object):
         else:
             del self.children[hashable.hashable_list(key)]
 
-    def confidence(self, smoothing=(1.,1.)):
-        return utils.confidence(self.url_count, self.success_count, smoothing)
-
     def add_url(self, url, success_count=0., url_count=1., prune_kwargs=None):
         """
         Recursively adds an URL to the prefix tree.
@@ -164,6 +163,13 @@ class PrefTree(object):
             if success:
                 self.assign(pruned)
 
+    def confidence(self, smoothing, depth):
+        """
+        Returns the confidence for this tree given a particular smoothing strategy and
+        depth of the tree (as a subtree of a larger tree).
+        """
+        return proba_confidence(smoothing.evaluate(self.url_count, self.success_count, depth))
+
     def match(self, url):
         """
         Matches the URL to the tree and returns the statistics (occurrence count,
@@ -204,10 +210,6 @@ class PrefTree(object):
         # ensure we are dealing with a non-flattened list (not a string)
         if type(url) != list:
             url = [c for c in url]
-
-        current_confidence = utils.confidence(self.url_count,
-                self.success_count)
-
 
         urls = 0
         successes = 0
@@ -255,7 +257,7 @@ class PrefTree(object):
         self.print_as_tree()
 
 
-    def prune(self, confidence_threshold=1.0, smoothing=(1.,1.), reverse=False, recurse=True):
+    def prune(self, smoothing=ConstantDirichlet(), depth=0, confidence_threshold=1.0, reverse=False, recurse=True):
         """
         Replaces subtrees where the confidence is higher than the
         threshold by a wildcard, with the same url and success counts.
@@ -277,11 +279,10 @@ class PrefTree(object):
             return (self, False)
 
         # Is this a good candidate for a prune ?
-        should_be_pruned = (self.confidence(smoothing) >= confidence_threshold and
+        should_be_pruned = (self.confidence(smoothing, depth) >= confidence_threshold and
                             len(self.children) > 0)
         has_been_pruned = False
 
-        success_rate = float(self.success_count)/self.url_count
         if should_be_pruned:
             self.is_wildcard = True
             self.children.clear()
@@ -291,6 +292,8 @@ class PrefTree(object):
             for path in self.children:
                 new_child, child_pruned = self.children[path].prune(
                                         confidence_threshold=confidence_threshold,
+                                        smoothing=smoothing,
+                                        depth=depth+len(path),
                                         reverse=reverse,
                                         recurse=True)
                 if child_pruned:
@@ -382,20 +385,24 @@ class PrefTree(object):
                              last_label=utils.flatten(key),
                               is_last_child=(i==nb_children-1))
 
-    def _generate_regex_internal(self, confidence_threshold=0.9,
-                            smoothing=(1.,1.), reverse=False):
+    def _generate_regex_internal(self, confidence_threshold,
+                            smoothing, depth, reverse=False):
         """
         Internal function regex generation
         """
         if len(self.children) == 0:
             if (2*self.success_count < self.url_count or
-                self.confidence(smoothing) < confidence_threshold):
+                self.confidence(smoothing, depth) < confidence_threshold):
                 return ''
             else:
                 return '.*' if self.is_wildcard else ''
 
         children_regexes = [
-            child.generate_regex(confidence_threshold, smoothing, branch, reverse)
+            child.generate_regex(confidence_threshold=confidence_threshold,
+                                smoothing=smoothing,
+                                depth=depth+len(branch),
+                                leading_branch=branch,
+                                reverse=reverse)
             for branch, child in list(self.children.items())
         ]
         filtered_children = [u for u in children_regexes if bool(u)]
@@ -406,7 +413,8 @@ class PrefTree(object):
         return children_disjunct
 
     def generate_regex(self, confidence_threshold=0.9,
-                            smoothing=(1.,1.),
+                            smoothing=ConstantDirichlet(),
+                            depth=0,
                             leading_branch=[],
                             reverse=False):
         """
@@ -421,7 +429,7 @@ class PrefTree(object):
         is treated as matching the empty language.
         """
         internal_re = self._generate_regex_internal(
-                confidence_threshold, smoothing, reverse)
+                confidence_threshold, smoothing, depth, reverse)
         if not internal_re:
             return ''
 
@@ -511,7 +519,8 @@ class RevPrefTree(PrefTree):
         super(RevPrefTree, self).print_as_tree(levels, last_label, is_last_child)
 
     def generate_regex(self, confidence_threshold=0.9,
-                            smoothing=(1.,1.),
+                            smoothing=ConstantDirichlet(),
+                            depth=0,
                             leading_branch=[],
                             reverse=False):
         """
@@ -526,7 +535,7 @@ class RevPrefTree(PrefTree):
         is treated as matching the empty language.
         """
         internal_re = self._generate_regex_internal(
-                confidence_threshold, smoothing, not reverse)
+                confidence_threshold, smoothing, depth, not reverse)
         if not internal_re:
             return ''
 

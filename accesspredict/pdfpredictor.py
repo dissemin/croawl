@@ -1,12 +1,8 @@
 # -*- encoding: utf-8 -*-
 
-#import PyPDF2
-#from PyPDF2.utils import PyPdfError
 import contextlib
 import re
-import unittest
 import zlib
-from io import StringIO
 from .predictor import URLCategoryPredictor
 
 allowed_content_types = [

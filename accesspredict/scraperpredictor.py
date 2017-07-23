@@ -1,10 +1,6 @@
 # -*- encoding: utf-8 -*-
 
-import json
-import requests
-import os
 import re
-import binascii
 from lxml import html
 from lxml import etree
 from requests.compat import urlparse

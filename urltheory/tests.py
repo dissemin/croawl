@@ -6,9 +6,11 @@ import doctest
 from hashable_collections.hashable_collections import hashable_list
 
 import urltheory
-from urltheory.tokenizer import *
+import urltheory.smoothing
+from urltheory.smoothing import NoSmoothing
+from urltheory.tokenizer import prepare_url
 from urltheory.preftree import PrefTree, RevPrefTree
-from urltheory.utils import flatten
+from urltheory.utils import flatten, proba_confidence
 
 class PrefTreeTest(unittest.TestCase):
     def test_empty(self):
@@ -60,7 +62,8 @@ class PrefTreeTest(unittest.TestCase):
                 ]
         for u, s in urls:
             t.add_url(u, s)
-        t, pruned = t.prune(confidence_threshold=0.1)
+        t, pruned = t.prune(confidence_threshold=1.,smoothing=NoSmoothing())
+        self.assertTrue(pruned)
 
         c, s, b = t.match_with_branch('aab/t/lu')
         self.assertEqual((c,s),(2,2))
@@ -98,8 +101,9 @@ class PrefTreeTest(unittest.TestCase):
                 ('gnu.org/about.html', False),
                 ]:
             t.add_url(url, success)
-        t, pruned = t.prune(confidence_threshold=0.05)
-        t.print_as_tree()
+        t, pruned = t.prune(confidence_threshold=proba_confidence(0.7),
+                            smoothing=NoSmoothing())
+
         self.assertEqual(len(t.urls()), 2)
         self.assertTrue(t.has_wildcard())
         self.assertEqual(t.match('arxiv.org/pdf/1784.1920'), (5,4))
@@ -113,7 +117,7 @@ class PrefTreeTest(unittest.TestCase):
         t.add_url('gnu.org/about.html', False)
         t.add_url('arxiv.org/pdf/1234.6789', True)
         t.add_url('zenodo.org/record/1278/', True)
-        t, pruned = t.prune(confidence_threshold=0.3)
+        t, pruned = t.prune(confidence_threshold=0.8, smoothing=NoSmoothing())
         self.assertFalse(pruned)
         self.assertFalse(t.has_wildcard())
 
@@ -233,5 +237,6 @@ class RevPrefTreeTest(unittest.TestCase):
 def load_tests(loader, tests, ignore):
     tests.addTests(doctest.DocTestSuite(urltheory.tokenizer))
     tests.addTests(doctest.DocTestSuite(urltheory.utils))
+    tests.addTests(doctest.DocTestSuite(urltheory.smoothing))
     return tests
 
