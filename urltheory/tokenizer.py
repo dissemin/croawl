@@ -73,24 +73,24 @@ def prepare_url(url):
     Prepares a URL to be fed, removing the protocol and reversing the
     domain name.
 
-    >>> prepare_url(u'http://dissem.in/faq')
+    >>> prepare_url('http://dissem.in/faq')
     ['.in', '.dissem', '/', 'f', 'a', 'q']
-    >>> prepare_url(u'//gnu.org')
+    >>> prepare_url('//gnu.org')
     ['.org', '.gnu']
-    >>> prepare_url(u'https://duckduckgo.com/?q=test')
+    >>> prepare_url('https://duckduckgo.com/?q=test')
     ['.com', '.duckduckgo', '/', '?', 'q', '=', 't', 'e', 's', 't']
-    >>> prepare_url(u'http://umas.edu:80/abs')
+    >>> prepare_url('http://umas.edu:80/abs')
     ['.edu', '.umas', ':80', '/', 'a', 'b', 's']
-    >>> prepare_url(u'http://umas.AC.uk/pdf')
+    >>> prepare_url('http://umas.AC.uk/pdf')
     ['.uk', '.ac', '.umas', '/', 'p', 'd', 'f']
-    >>> prepare_url(u'//localhost:8000/t')
+    >>> prepare_url('//localhost:8000/t')
     ['.localhost', ':8000', '/', 't']
     >>> prepare_url(None)
-    >>> prepare_url(u'http://dx.doi.org/10.3406/134')
+    >>> prepare_url('http://dx.doi.org/10.3406/134')
     ['.org', '.doi', '.dx', '/', '10.3406', '/', 0]
-    >>> prepare_url(u'http://hdl.handle.net/10985/7376')
+    >>> prepare_url('http://hdl.handle.net/10985/7376')
     ['.net', '.handle', '.hdl', '/', '10985', '/', 0]
-    >>> prepare_url(u'//gnu.org/?utm_source=twitter&jsessionid=e452fb1')
+    >>> prepare_url('//gnu.org/?utm_source=twitter&jsessionid=e452fb1')
     ['.org', '.gnu', '/']
     """
     if not url:
