@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 import hashable_collections.hashable_collections as hashable
 
@@ -248,8 +248,8 @@ class PrefTree(object):
                 self[path].print_subtree(url[len(path):])
                 return
 
-        print "unmatched: "
-        print url
+        print("unmatched: ")
+        print(url)
         self.print_as_tree()
 
 
@@ -356,7 +356,7 @@ class PrefTree(object):
         """
         if self.is_wildcard:
             return True
-        for subtree in self.children.values():
+        for subtree in list(self.children.values()):
             if subtree.has_wildcard():
                 return True
         return False
@@ -385,7 +385,7 @@ class PrefTree(object):
         if type(last_label) == str:
             last_label = last_label.decode('utf-8')
 
-        print (pipes+last_label+(' '+count_label)).encode('utf-8')
+        print((pipes+last_label+(' '+count_label)).encode('utf-8'))
 
         nb_children = len(self.children)
         for i, (key, val) in enumerate(self.children.items()):
@@ -407,10 +407,9 @@ class PrefTree(object):
 
         children_regexes = [
             child.generate_regex(confidence_threshold, smoothing, branch, reverse)
-            for branch, child in self.children.items()
+            for branch, child in list(self.children.items())
         ]
-        filtered_children = filter(lambda u: bool(u),
-                                    children_regexes)
+        filtered_children = [u for u in children_regexes if bool(u)]
 
         children_disjunct = str('|').join(filtered_children)
         if len(filtered_children) > 1:
@@ -460,8 +459,8 @@ class PrefTree(object):
                     return False
 
         # 2 / Check that the number of urls and successes are consistent
-        num_url_children = sum([c.url_count for c in self.children.values()])
-        num_success_children = sum([c.success_count for c in self.children.values()])
+        num_url_children = sum([c.url_count for c in list(self.children.values())])
+        num_success_children = sum([c.success_count for c in list(self.children.values())])
         num_leaf_urls = self.url_count - num_url_children
         num_leaf_successes = self.success_count - num_success_children
         if not (num_leaf_urls >= 0 and
@@ -475,7 +474,7 @@ class PrefTree(object):
             return False
 
         # 4 / Recursively check the children
-        for val in self.children.values():
+        for val in list(self.children.values()):
             if not val.check_sanity(True):
                 return False
 

@@ -1,8 +1,8 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 from gevent.lock import Semaphore
 from urltheory.preftree import PrefTree
-import cPickle
+import pickle
 
 class URLForest(object):
     """
@@ -70,7 +70,7 @@ class URLForest(object):
         """
         Tears down the forest (please don't do this in Amazonia).
         """
-        if any(s.locked() for s in self.locks.values()):
+        if any(s.locked() for s in list(self.locks.values())):
             raise ValueError('The forest is still in use.')
         self.trees.clear()
         self.locks.clear()
@@ -81,8 +81,8 @@ class URLForest(object):
         """
         self.clear()
         with open(fname, 'rb') as f:
-            new_trees = cPickle.load(f)
-            for id, tree in new_trees.items():
+            new_trees = pickle.load(f)
+            for id, tree in list(new_trees.items()):
                 self.add_tree(id, tree)
 
     def save(self, fname):
@@ -90,5 +90,5 @@ class URLForest(object):
         Saves the forest to a file (with pickle)
         """
         with open(fname, 'wb') as f:
-            cPickle.dump(self.trees, f)
+            pickle.dump(self.trees, f)
 

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 import unittest
 import doctest
@@ -156,7 +156,7 @@ class PrefTreeTest(unittest.TestCase):
         t.print_as_tree()
         self.assertTrue(t.check_sanity())
         for u, c, s in t.urls():
-            print flatten(u), c, s
+            print(flatten(u), c, s)
 
     def test_accessors(self):
         t = PrefTree()

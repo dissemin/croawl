@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 import json
 import requests
 import os
@@ -53,5 +53,5 @@ class ZoteroFullTextPredictor(URLCategoryPredictor):
             json_resp = r.json()
             return self.find_full_text(json_resp)
         except (ValueError, requests.exceptions.RequestException) as e:
-            print e
+            print(e)
             return 0.

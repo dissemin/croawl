@@ -1,12 +1,12 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 #import PyPDF2
 #from PyPDF2.utils import PyPdfError
 import contextlib
 import re
 import unittest
 import zlib
-from StringIO import StringIO
+from io import StringIO
 from .predictor import URLCategoryPredictor
 
 allowed_content_types = [
@@ -74,7 +74,7 @@ class PDFPredictor(URLCategoryPredictor):
                 #return (not reader.isEncrypted and
                 #        reader.getNumPages() >= self.min_pages)
             except (ValueError, zlib.error) as e:
-                print e
+                print(e)
                 # PyPDF2 failed (maybe it believes the file is encrypted…)
                 return 0.
 

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 import json
 import requests
 import os
@@ -38,7 +38,7 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
         # Use any link if it shares any identifier with
         # the current URL.
         target_identifiers = set(identifiers_re.findall(url))
-        print target_identifiers
+        print(target_identifiers)
         for link in self.meta_and_a_links(root):
             identifiers = set(identifiers_re.findall(link))
             if identifiers & target_identifiers:
@@ -64,9 +64,9 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
                 continue
             new_url = normalize_outgoing_url(orig_url, new_url.strip())
             if not new_url:
-                print "INVALID URL:"
-                print orig_url
-                print new_url
+                print("INVALID URL:")
+                print(orig_url)
+                print(new_url)
                 continue
             parsed = urlparse(new_url)
             if not parsed.hostname:
@@ -91,10 +91,10 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
         if content_type.startswith('text/html'):
             links = self.extract_good_links(url, request.content)
             links = set(self.normalize_urls(url, links))
-            print "~~ URLs extracted from %s" % url
+            print("~~ URLs extracted from %s" % url)
             for l in links:
-                print l
-            print "~~~"
+                print(l)
+            print("~~~")
 
             return max([self.spider.predict('pdf', pdf_url,
                        referer=url, min_confidence=min_confidence)

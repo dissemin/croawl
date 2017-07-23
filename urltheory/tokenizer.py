@@ -6,8 +6,8 @@
 
 from requests.compat import urlparse
 from requests.compat import urlencode
-from urlparse import parse_qs
-from urlparse import urlunparse
+from urllib.parse import parse_qs
+from urllib.parse import urlunparse
 import re
 
 url_scanner = re.Scanner([
@@ -30,12 +30,10 @@ def cleanup_parameters(querystring):
     >>> cleanup_parameters('page=3&utm_source=twitter.com')
     'page=3'
     """
-    if type(querystring) == unicode:
+    if type(querystring) == str:
         querystring = querystring.encode('utf-8')
     args = parse_qs(querystring)
-    filtered_args = filter(
-        lambda (k, v): session_parameter_re.match(k) is None,
-        args.items())
+    filtered_args = [k_v for k_v in list(args.items()) if session_parameter_re.match(k_v[0]) is None]
     cleaned_args = urlencode(dict(filtered_args), doseq=True)
     return cleaned_args
 

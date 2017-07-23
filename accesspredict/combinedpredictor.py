@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 from .predictor import URLCategoryPredictor
 
 class CombinedPredictor(URLCategoryPredictor):
@@ -90,7 +90,7 @@ class BinaryCombinedPredictor(CombinedPredictor):
         raise NotImplemented()
 
     def __unicode__(self):
-        return ' '.join([unicode(self.p1), self.operator, unicode(self.p2)])
+        return ' '.join([str(self.p1), self.operator, str(self.p2)])
 
 class EqualCombinedPredictor(BinaryCombinedPredictor):
     operator = '=='

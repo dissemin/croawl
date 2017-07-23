@@ -1,11 +1,11 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from collections import defaultdict
 from urltheory.preftree import *
 from urltheory.tokenizer import *
 
-import codecs, cPickle
+import codecs, pickle
 
 class URLCorpus(object):
     """
@@ -27,7 +27,8 @@ class URLCorpus(object):
         else:
             self.out_sync = f
 
-    def _write_url(self, (url,success), f):
+    def _write_url(self, xxx_todo_changeme, f):
+        (url,success) = xxx_todo_changeme
         f.write('\t'.join([url, ('1' if success else '0')])+'\n')
 
     def add_url(self, url, success=False):
@@ -48,7 +49,7 @@ class URLCorpus(object):
             for line in f:
                 fields = line.strip().split('\t')
                 if len(fields) != 2:
-                    print "Invalid line, %d fields" % len(fields)
+                    print("Invalid line, %d fields" % len(fields))
                     continue
                 self.add_url(fields[0], fields[1] == '1')
 

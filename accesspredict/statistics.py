@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 from collections import defaultdict
 from datetime import datetime
 import json
@@ -35,7 +35,7 @@ class CrawlingStatistics(object):
 
     def log_all(self):
         elapsed = datetime.utcnow() - self.start
-        print "////////// logging "
+        print("////////// logging ")
         for key in self.keys:
             val = self.accu[key]
             self.lines[key].append([elapsed.seconds/60.0, val])
@@ -46,14 +46,14 @@ class CrawlingStatistics(object):
         self.output = stats_html_header
 
         groups = defaultdict(list)
-        for name, values in self.lines.items():
+        for name, values in list(self.lines.items()):
             parts = name.split(':')
             if len(parts) < 2:
-                print "skipping %s" % name
+                print("skipping %s" % name)
                 continue
             groups[parts[0]].append(name)
 
-        for group, contents in groups.items():
+        for group, contents in list(groups.items()):
             self.plot(contents, group)
         with open(fname, 'w') as f:
             f.write(self.output + stats_html_footer)

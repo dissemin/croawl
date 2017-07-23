@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 from .forest import URLForest
 from urltheory.utils import confidence
 from urltheory.utils import proba_confidence
@@ -81,7 +81,7 @@ class Spider(object):
         self.incr(class_id+':incoming')
 
         # Coerce to unicode
-        if type(url) != unicode:
+        if type(url) != str:
             url = url.decode('utf-8')
 
         # Normalize the URL and check if we haven't checked it yet
@@ -112,8 +112,8 @@ class Spider(object):
         answer = self._get_preftree_answer(class_id, tokenized, min_confidence)
 
         if answer is not None and proba_confidence(answer) > min_confidence:
-            print "## skipped %s" % url
-            print "   answer: %f" % answer
+            print("## skipped %s" % url)
+            print("   answer: %f" % answer)
             self.incr(class_id+':filtered')
             return answer
 
@@ -144,7 +144,7 @@ class Spider(object):
 
             self.incr(class_id+':requested')
 
-            print "## fetching %s" % url
+            print("## fetching %s" % url)
             if predictor.head_mode:
                 r = requests.head(url, **kwargs)
             else:
@@ -204,9 +204,9 @@ class Spider(object):
             return None
 
         obtained_confidence = confidence(url_count, success_count, self.smoothing[class_id])
-        print "threshold: %f" % min_confidence
-        print "count: %d/%d" % (success_count, url_count)
-        print "confidence: %f" % obtained_confidence
+        print("threshold: %f" % min_confidence)
+        print("count: %d/%d" % (success_count, url_count))
+        print("confidence: %f" % obtained_confidence)
         if obtained_confidence > min_confidence:
             return 2*success_count >= url_count
 

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from requests.compat import urlparse, urljoin
 from requests.utils import requote_uri
