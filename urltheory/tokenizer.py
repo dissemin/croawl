@@ -3,7 +3,6 @@
 from requests.compat import urlparse
 from requests.compat import urlencode
 from urllib.parse import parse_qs
-print('hi')
 from urllib.parse import urlunparse
 import re
 

@@ -18,7 +18,7 @@ before_script:
   - cp config.py.in config.py
 
 script:
-  - coverage run --source=urltheory,accesspredict -m unittest -v
+  - coverage run --source=urltheory,accesspredict run_tests.py
 
 after_success:
   - coveralls
