@@ -1,12 +1,9 @@
 # -*- encoding: utf-8 -*-
 
-# Purposely ommited:
-# from __future__ import unicode_literals
-# because URLs should be handled as pure ASCII
-
 from requests.compat import urlparse
 from requests.compat import urlencode
 from urllib.parse import parse_qs
+print('hi')
 from urllib.parse import urlunparse
 import re
 

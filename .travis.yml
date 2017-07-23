@@ -18,7 +18,7 @@ before_script:
   - cp config.py.in config.py
 
 script:
-  - coverage run --source=urltheory,croawl -m unittest -v
+  - coverage run --source=urltheory,accesspredict -m unittest -v
 
 after_success:
   - coveralls
