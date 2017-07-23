@@ -1,0 +1,25 @@
+import unittest
+
+from .pdfpredictor import PDFPredictor
+
+class PDFPredictorTest(unittest.TestCase):
+    def check_url(self, url, expected):
+        import requests
+        p = PDFPredictor()
+        value = p.predict_after_fetch(requests.get(url), url, None)
+        self.assertEqual(value, expected)
+
+    def test_pdf(self):
+        self.check_url('https://arxiv.org/pdf/1611.07004.pdf', 1.)
+
+    def test_psgz(self):
+        self.check_url('http://cds.cern.ch/record/682079/files/larg-96-064.ps.gz', 1.)
+
+    def test_djvu(self):
+        self.check_url('http://bibliotekacyfrowa.eu/Content/25196/027048-0001.djvu', 1.)
+
+    def test_html(self):
+        self.check_url('http://www.die-bonn.de/id/17041_p1/about/html/?lang=de', 0.)
+
+    def test_targz(self):
+        self.check_url('http://gdac.broadinstitute.org/runs/analyses__2014_07_15/data/PAAD-TP/20140715/gdac.broadinstitute.org_PAAD-TP.mRNAseq_Clustering_CNMF.Level_4.2014071500.0.0.tar.gz', 0.)
