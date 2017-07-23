@@ -7,6 +7,8 @@ from hashable_collections.hashable_collections import hashable_list
 
 import urltheory
 import urltheory.smoothing
+import urltheory.tokenizer
+import urltheory.preftree
 from urltheory.smoothing import NoSmoothing
 from urltheory.tokenizer import prepare_url
 from urltheory.preftree import PrefTree, RevPrefTree
