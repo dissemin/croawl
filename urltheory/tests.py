@@ -8,7 +8,6 @@ from hashable_collections.hashable_collections import hashable_list
 import urltheory
 from urltheory.tokenizer import *
 from urltheory.preftree import PrefTree, RevPrefTree
-from urltheory.urlfilter import *
 from urltheory.utils import flatten
 
 class PrefTreeTest(unittest.TestCase):

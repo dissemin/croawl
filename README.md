@@ -1,4 +1,4 @@
-# croawl [![Build Status](https://travis-ci.org/dissemin/croawl.svg)](https://travis-ci.org/dissemin/croawl)
+# croawl [![Build Status](https://travis-ci.org/dissemin/croawl.svg)](https://travis-ci.org/dissemin/croawl) [![Coverage Status](https://coveralls.io/repos/github/dissemin/croawl/badge.svg?branch=master)](https://coveralls.io/github/dissemin/croawl?branch=master)
 Crawler to predict the availability of a full text at a given URL
 
 Goal
