@@ -64,8 +64,8 @@ def longest_common_prefix(a,b):
     []
     >>> longest_common_prefix([0,1],[0,2,3])
     [0]
-    >>> longest_common_prefix(u'hi there', u'himself')
-    [u'h', u'i']
+    >>> longest_common_prefix('hi there', 'himself')
+    ['h', 'i']
     """
     idx = 0
     ret = []
@@ -80,8 +80,8 @@ def flatten(lst):
 
     >>> flatten([])
     ''
-    >>> flatten([u'a',u'b'])
-    u'ab'
+    >>> flatten(['a','b'])
+    'ab'
     >>> flatten([1,3,5])
     '135'
     """

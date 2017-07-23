@@ -382,10 +382,10 @@ class PrefTree(object):
                 color = '\033[33;7m%s\033[0m'
         count_label = color % ('(%.1f/%.1f)' %
                     (self.success_count, self.url_count))
-        if type(last_label) == str:
+        if type(last_label) == bytes:
             last_label = last_label.decode('utf-8')
 
-        print((pipes+last_label+(' '+count_label)).encode('utf-8'))
+        print(pipes+last_label+(' '+count_label))
 
         nb_children = len(self.children)
         for i, (key, val) in enumerate(self.children.items()):
