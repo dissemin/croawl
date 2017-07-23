@@ -131,8 +131,8 @@ def min_count_for_confidence(confidence_threshold, smoothing):
     (as a pair of floats), return the minimum number of
     observed classifications to return a confident estimation.
 
-    >>> min_count_for_confidence(proba_confidence(0.95), (1.,4.))
-    0
+    >>> int(round(min_count_for_confidence(proba_confidence(0.95), (1.,4.))))
+    75
     """
     r = inverse_proba_confidence(confidence_threshold)
     alpha, beta = smoothing
