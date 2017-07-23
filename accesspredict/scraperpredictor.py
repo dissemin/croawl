@@ -96,9 +96,10 @@ class ScraperFullTextPredictor(URLCategoryPredictor):
                 print(l)
             print("~~~")
 
-            return max([self.spider.predict('pdf', pdf_url,
+            return max([0.]+
+                       [self.spider.predict('pdf', pdf_url,
                        referer=url, min_confidence=min_confidence)
-                        for pdf_url in links], 0.)
+                        for pdf_url in links])
         else: # we are dealing with a candidate PDF file
             for chunk in request.iter_content(chunk_size=1024):
                 return float(pdf_file_start_re.match(chunk) is not None)

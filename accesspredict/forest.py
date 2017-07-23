@@ -44,6 +44,14 @@ class URLForest(object):
         """
         return self._run_method('match', id, *args, **kwargs)
 
+    def match_length(self, id, *args, **kwargs):
+        """
+        Matches a URL with the tree identified by the identifier.
+        All arguments after the first one are passed to PrefTree.match()
+        """
+        return self._run_method('match_length', id, *args, **kwargs)
+
+
     def add_url(self, id, *args, **kwargs):
         """
         Adds an URL to the tree identified by the identifier.

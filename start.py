@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 import codecs
 
 from accesspredict.pdfpredictor import *
@@ -8,6 +9,7 @@ from accesspredict.spider import *
 from accesspredict.urldataset import URLDataset
 from accesspredict.combinedpredictor import P
 from accesspredict.statistics import CrawlingStatistics
+from accesspredict.smoothing import ExponentialDirichlet
 
 from gevent.pool import Pool
 from config import redis_client
@@ -33,8 +35,8 @@ dumpname = 'crossref.train'
 #dumpname = 'pdftest'
 
 spider = Spider(forest=uf, dataset=ud, stats=stats)
-spider.add_predictor('pdf', PDFPredictor(), (1.,4.))
-spider.add_predictor('custom', ScraperFullTextPredictor(), (5.,5.))
+spider.add_predictor('pdf', PDFPredictor(), ExponentialDirichlet())
+spider.add_predictor('custom', ScraperFullTextPredictor(), ExponentialDirichlet())
 #spider.add_predictor('zotero', ZoteroFullTextPredictor())
 #spider.add_predictor('diff', P('custom') != (P('zotero') | P('pdf')))
 
@@ -55,7 +57,7 @@ def urls():
 
 def crawler():
     for result in pool.imap_unordered(lambda u: spider.predict('custom',u), urls()):
-        print "-- final result: %s" % unicode(result)
+        print("-- final result: {}".format(result))
 
 crawler_greenlet = gevent.Greenlet(crawler)
 crawler_greenlet.start()

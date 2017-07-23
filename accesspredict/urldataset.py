@@ -24,6 +24,7 @@ class URLDataset(object):
         val = self.client.hget(class_id, url)
         if not val:
             return
+        val = val.decode('utf-8')
         fields = val.split(':')
         return (float(fields[0]), fields[1])
 
@@ -81,6 +82,7 @@ class URLDataset(object):
         isn't designed for concurrent usage.
         """
         for class_id in self._iterate_classes():
+            class_id = class_id.decode('utf-8')
             new_tree = self.feed_to_tree(class_id, forest.trees[class_id])
             forest.trees[class_id] = new_tree
 
@@ -90,7 +92,8 @@ class URLDataset(object):
         """
         for item in self.client.hscan_iter(class_id):
             url, redis_val = item
-            parsed = redis_val.split(':')
+            url = url.decode('utf-8')
+            parsed = redis_val.decode('utf-8').split(':')
             val = float(parsed[0])
             datestamp = parsed[1]
             yield (url, val, datestamp)
@@ -108,6 +111,6 @@ class URLDataset(object):
         with open(fname, 'w') as f:
             for class_id in self._iterate_classes():
                 for (url, val, datestamp) in self._iterate_urls(class_id):
-                    val = str(val)
+                    class_id = class_id.decode('utf-8')
                     f.write(str('\t').join([datestamp, class_id, val, url])+str('\n'))
 

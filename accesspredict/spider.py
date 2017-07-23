@@ -38,7 +38,7 @@ class Spider(object):
         used, unless there is none, in which case the tree provided
         will be used.
 
-        :param smoothing: the smoothing value (pair of floats) for this predictor
+        :param smoothing: the SmoothingStrategy for this predictor
         """
         if class_id in self:
             raise ValueError('We already have a tree for "%s"' % class_id)
@@ -129,7 +129,7 @@ class Spider(object):
             return post_filter_url_answer
 
         # otherwise, fetch and classify manually
-        answer = False # by default
+        answer = 0. # by default
         try:
             kwargs = {
                 'allow_redirects':False,
@@ -167,28 +167,34 @@ class Spider(object):
 
             # classify manually
             answer = predictor.predict_after_fetch(r, url, tokenized, min_confidence)
-        except requests.exceptions.RequestException:
-            pass
-        except UnicodeDecodeError:
-            pass
+            if type(answer) != float:
+                raise ValueError('Predictor {} did not return a float for url {}'.format(class_id, url))
+        except requests.exceptions.RequestException as e:
+            print(e)
+            answer = 0.
+        except UnicodeDecodeError as e:
+            print(e)
+            answer = 0.
 
         self._update_history_classification(class_id, new_history, answer)
         return answer
 
-    def _update_history_classification(self, class_id, history, status):
+    def _update_history_classification(self, class_id, history, proba):
         """
-        Given a list of (url, tokenized), and a boolean status,
+        Given a list of (url, tokenized), and a classification probability,
         add all urls in the history to the prefix tree with the given
-        status
+        probability.
         """
+        if type(proba) != float:
+            raise ValueError('The proba has to be a float, got "{}" instead'.format(proba))
         for url, tokenized in history:
             self.incr(class_id+':learned')
             if self.dataset is not None:
-                self.dataset.set(url, class_id, status)
+                self.dataset.set(url, class_id, proba)
             # TODO: this involves acquiring and releasing many times
             # the same lock. Add a method in URLForest to add many URLs
             # that acquires the lock only once.
-            self.forest.add_url(class_id, tokenized, status)
+            self.forest.add_url(class_id, tokenized, proba)
 
     def _get_preftree_answer(self, class_id, tokenized, min_confidence):
         """
@@ -197,18 +203,17 @@ class Spider(object):
         a class, or None if a manual classification is
         needed
         """
-        url_count, success_count = self.forest.match(class_id,
-            tokenized, maximum_confidence=True)
+        url_count, success_count, length = self.forest.match_length(class_id, tokenized)
 
         if not url_count:
             return None
 
-        obtained_confidence = confidence(url_count, success_count, self.smoothing[class_id])
+        smoothed = self.smoothing[class_id].evaluate(url_count, success_count, length)
+        obtained_confidence = proba_confidence(smoothed)
         print("threshold: %f" % min_confidence)
         print("count: %d/%d" % (success_count, url_count))
         print("confidence: %f" % obtained_confidence)
         if obtained_confidence > min_confidence:
             return 2*success_count >= url_count
-
 
 

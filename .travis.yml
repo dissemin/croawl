@@ -15,9 +15,10 @@ install:
 
 before_script:
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
+  - cp config.py.in config.py
 
 script:
-  - coverage run --source=urltheory,croawl urltheory/tests.py -v
+  - coverage run --source=urltheory,croawl -m unittest -v
 
 after_success:
   - coveralls

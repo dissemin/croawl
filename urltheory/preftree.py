@@ -164,32 +164,39 @@ class PrefTree(object):
             if success:
                 self.assign(pruned)
 
-    def match(self, url, maximum_confidence=False):
+    def match(self, url):
         """
-        Returns the number of times this URL was added and the number of times
-        it was marked as a success.
+        Matches the URL to the tree and returns the statistics (occurrence count,
+        success count) of the end node.
 
         :returns: a pair of integers
         """
-        tot_count, success_count, _ = self.match_with_branch(url,
-                                maximum_confidence=maximum_confidence)
+        tot_count, success_count, _ = self.match_with_branch(url)
         return (tot_count, success_count)
 
-    def match_with_branch(self, url, maximum_confidence=False):
+    def match_length(self, url):
+        """
+        Matches the URL to the tree and returns the statistics of the node,
+        plus the length of the matching prefix.
+
+        :returns: a triple of integers:
+        - the number of times URLs matching with the node were added
+        - the number of times they were marked as a success
+        - the length of the matching prefix
+        """
+        tot_count, success_count, branch = self.match_with_branch(url)
+        return (tot_count, success_count, len(branch))
+
+
+    def match_with_branch(self, url):
         """
         As match(), returns the total and success count for a given URL,
         but also the pattern of the branch corresponding to that URL in the tree.
 
         :para url: the tokenized url to match
-        :para maximum_confidence: if set to true, instead of returning
-                the counts for the leaf of the tree that matches the URL,
-                we return the counts for the node in the branch with
-                maximum confidence. This provides a form of
-                generalization, by effectively ignoring the second
-                part of the branch (after that most confident node).
 
         :returns: a tuple: (total_count, success_count, branch)
-            where the branch is a list listing all the labels of the branches.
+            where the branch is a list all the labels of the branches.
         """
         if self.is_wildcard:
             return (self.url_count, self.success_count, ['*'])
@@ -216,13 +223,8 @@ class PrefTree(object):
             if list(url[:len(path)]) == list(path):
                 # we found a matching branch
                 tot_count, suc_count, sub_branch = subtree.match_with_branch(
-                        url[len(path):],
-                        maximum_confidence=maximum_confidence)
-                sub_confidence = utils.confidence(tot_count, suc_count)
-                if not maximum_confidence or sub_confidence > current_confidence:
-                    return (tot_count, suc_count, path + sub_branch)
-                else:
-                    return (self.url_count, self.success_count, [])
+                        url[len(path):])
+                return (tot_count, suc_count, path + sub_branch)
 
         if len(url) == 0:
             # the url ends here
@@ -252,19 +254,6 @@ class PrefTree(object):
         print(url)
         self.print_as_tree()
 
-
-    def predict_success(self, url, confidence_threshold=0.95):
-        """
-        Returns True when the number of successes matching this url
-        is positive and above threshold * url_count, which corresponds
-        to predicting a success.
-        Returns False when it predicts a failure, and returns nothing
-        when it fails to predict.
-        """
-        url_count, success_count = self.match(url, confidence_threshold)
-        c = utils.confidence(url_count, success_count)
-        if c > confidence_threshold:
-            return 2*success_count >= url_count
 
     def prune(self, confidence_threshold=1.0, smoothing=(1.,1.), reverse=False, recurse=True):
         """
@@ -380,8 +369,8 @@ class PrefTree(object):
                 color = '\033[32;7m%s\033[0m'
             elif rate > 0.1:
                 color = '\033[33;7m%s\033[0m'
-        count_label = color % ('(%.1f/%.1f)' %
-                    (self.success_count, self.url_count))
+        count_label = color % ('(%d/%d)' %
+                    (int(round(self.success_count)), int(round(self.url_count))))
         if type(last_label) == bytes:
             last_label = last_label.decode('utf-8')
 

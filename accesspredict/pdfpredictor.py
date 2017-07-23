@@ -56,7 +56,7 @@ class PDFPredictor(URLCategoryPredictor):
 
                 # check that the content-type looks legit
                 content_type = request.headers.get('content-type')
-                if not any(content_type.startswith(c)
+                if content_type and not any(content_type.startswith(c)
                             for c in allowed_content_types):
                     return 0.
 
@@ -68,6 +68,7 @@ class PDFPredictor(URLCategoryPredictor):
                         data = d.decompress(chunk, 32)
                     return float(acceptable_file_start_re.match(data) is not None)
 
+                return 0.
                 # Old code that downloads the whole PDF and parses it
                 #f = StringIO(request.content)
                 #reader = PyPDF2.PdfFileReader(f)

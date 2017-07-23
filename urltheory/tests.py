@@ -105,8 +105,6 @@ class PrefTreeTest(unittest.TestCase):
         self.assertTrue(t.has_wildcard())
         self.assertEqual(t.match('arxiv.org/pdf/1784.1920'), (5,4))
         self.assertEqual(t.match('arxiv.org/pdf/2340.0124'), (0,0))
-        self.assertTrue(t.predict_success('arxiv.org/pdf/1784.1920',
-            confidence_threshold=0.05))
 
         self.assertEqual(t.generate_regex(
                 confidence_threshold=0.05), 'arxiv\.org\/pdf\/1.*')
@@ -131,8 +129,6 @@ class PrefTreeTest(unittest.TestCase):
             t.add_url(url, success)
         t, pruned = t.prune(confidence_threshold=0.2)
         self.assertEqual(t.match('sciencedirect.com/paper4.pdf'), (3,0))
-        self.assertEqual(t.predict_success('sciencedirect.com/paper4.pdf',
-                        confidence_threshold=0.2), False)
 
     def test_prune_empty(self):
         t = PrefTree()
@@ -240,5 +236,3 @@ def load_tests(loader, tests, ignore):
     tests.addTests(doctest.DocTestSuite(urltheory.utils))
     return tests
 
-if __name__ == '__main__':
-    unittest.main()
