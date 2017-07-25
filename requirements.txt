@@ -1,6 +1,7 @@
 gevent
 redis
 requests
+requests-cache
 hashable_collections
 service_identity # to fix a bug in scrapy
 PyPDF2

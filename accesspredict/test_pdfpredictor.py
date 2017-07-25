@@ -1,8 +1,17 @@
 import unittest
+import requests_cache
 
 from .pdfpredictor import PDFPredictor
 
 class PDFPredictorTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        requests_cache.install_cache('cache/pdfpredictor')
+
+    @classmethod
+    def tearDownClass(cls):
+        requests_cache.uninstall_cache()
+
     def check_url(self, url, expected):
         import requests
         p = PDFPredictor()
